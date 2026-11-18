@@ -31,7 +31,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.7.0'
+        this.version := '0.7.1'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -577,6 +577,24 @@ RunChecks() {
         throw Error('Полоса прокрутки не соответствует положению страницы')
     scroll.SetOffset(0)
     app.ShowPage('Основное')
+    app.switchingPage := true
+    app.ShowPage('Репорты')
+    app.ShowPage('Настройки')
+    app.switchingPage := false
+    app.DispatchQueuedPage()
+    if app.currentPage != 'Настройки' || app.queuedPage != ''
+        throw Error('Повторные клики не открывают последнюю выбранную страницу')
+    for page, controls in app.pages {
+        if page = app.currentPage
+            continue
+        for control in controls {
+            if control is ScrollPage {
+                if control.Visible
+                    throw Error('Прокручиваемая область осталась на чужой странице')
+            } else if DllCall('GetWindowLongPtr', 'ptr', control.Hwnd, 'int', -16, 'ptr') & 0x10000000
+                throw Error('Элемент раздела остался видимым после переключения: ' page)
+        }
+    }
     for list in [app.list, app.bindList, app.customList] {
         if SendMessage(0x1037, 0, 0, list) & 1
             throw Error('В списке осталась сетка')
@@ -752,6 +770,13 @@ RunChecks() {
     Sleep 220
     if app.rows.Length != 1 || app.rows[1].key != '/hatiksu_test'
         throw Error('Не работает отложенный поиск')
+    if Theme.listData[app.list.Hwnd].Length != app.list.GetCount() || Theme.listData[app.list.Hwnd][1][2] != app.list.GetText(1, 2)
+        throw Error('Данные отрисовки списка не соответствуют результатам поиска')
+    cachePointer := ObjPtr(Theme.listData[app.list.Hwnd])
+    app.ShowPage('Основное')
+    app.ShowPage('Триггеры')
+    if ObjPtr(Theme.listData[app.list.Hwnd]) != cachePointer
+        throw Error('Возврат в раздел заново создал неизменившийся список')
     app.SetFaction('WN')
     app.SetESP(2)
     for name, value in Map('dis', '@мой_дискорд', 'gadis', '@главный', 'zgadis', '@заместитель') {
@@ -817,3 +842,33 @@ CheckClickText(app, page, label) {
 if A_Args.Length && A_Args[1] = '--check'
     RunChecks()
 rootBinder := Binder()
+if A_Args.Length && A_Args[1] = '--profile-ui' {
+    uiProfilePoll := WaitForProfileWindow.Bind(rootBinder)
+    SetTimer uiProfilePoll, 100
+}
+
+WaitForProfileWindow(app) {
+    global uiProfilePoll
+    if !WinActive('ahk_id ' app.window.Hwnd)
+        return
+    SetTimer uiProfilePoll, 0
+    RunNavigationProfile(app)
+}
+
+RunNavigationProfile(app) {
+    label := A_Args.Length >= 2 ? A_Args[2] : 'navigation'
+    path := A_ScriptDir '\work\ui-profile-' RegExReplace(label, '[^a-zA-Z0-9_-]') '.txt'
+    if FileExist(path)
+        FileDelete path
+    DllCall('QueryPerformanceFrequency', 'int64*', &frequency := 0)
+    for name in ['Триггеры', 'Основное', 'Триггеры', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Триггеры', 'Настройки', 'Основное'] {
+        FileAppend 'START ' name '`n', path, 'UTF-8'
+        DllCall('QueryPerformanceCounter', 'int64*', &started := 0)
+        app.ShowPage(name)
+        DllCall('RedrawWindow', 'ptr', app.window.Hwnd, 'ptr', 0, 'ptr', 0, 'uint', 0x185)
+        DllCall('QueryPerformanceCounter', 'int64*', &finished := 0)
+        FileAppend Format('{:.2f}', (finished - started) * 1000 / frequency) ' ms ' name '`n', path, 'UTF-8'
+        Sleep 80
+    }
+    FileAppend 'DONE`n', path, 'UTF-8'
+}

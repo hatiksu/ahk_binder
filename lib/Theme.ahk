@@ -6,6 +6,7 @@ class Theme {
     static panels := []
     static rowImages := []
     static listColumns := Map()
+    static listData := Map()
 
     static Button(g, options, text, color := '303033') {
         c := g.AddButton(options ' +0x4000000', text)
@@ -176,6 +177,8 @@ class Theme {
 
     static Select(c, selected, color := '') {
         item := this.items[c.Hwnd]
+        if item.selected = selected && (color = '' || item.color = color)
+            return
         item.selected := selected
         if color != ''
             item.color := color
@@ -209,7 +212,13 @@ class Theme {
         c.SetImageList(images, 1)
         this.rowImages.Push(images)
         this.listColumns[c.Hwnd] := columns
+        if this.listData.Has(c.Hwnd)
+            this.listData.Delete(c.Hwnd)
         c.OnNotify(-12, this.ListDraw.Bind(this))
+    }
+
+    static SetListData(c, rows) {
+        this.listData[c.Hwnd] := rows
     }
 
     static ListDraw(c, notification) {
@@ -238,7 +247,8 @@ class Theme {
         DllCall('SetBkMode', 'ptr', dc, 'int', 1)
         top := SendMessage(0x1027, 0, 0, c)
         visible := SendMessage(0x1028, 0, 0, c) + 1
-        count := c.GetCount()
+        cached := this.listData.Get(c.Hwnd, 0)
+        count := cached ? cached.Length : c.GetCount()
         widths := []
         loop this.listColumns[c.Hwnd]
             widths.Push(SendMessage(0x101D, A_Index - 1, 0, c))
@@ -256,7 +266,7 @@ class Theme {
             DllCall('SetTextColor', 'ptr', dc, 'uint', this.Color(selected ? 'CDBFFF' : 'DEDEE7'))
             x := -offset
             for column, cellWidth in widths {
-                text := c.GetText(row + 1, column)
+                text := cached ? cached[row + 1][column] : c.GetText(row + 1, column)
                 NumPut('int', x + 14, 'int', y, 'int', x + cellWidth - 12, 'int', bottom, rect)
                 DllCall('DrawTextW', 'ptr', dc, 'str', text, 'int', -1, 'ptr', rect, 'uint', 0x8824)
                 x += cellWidth

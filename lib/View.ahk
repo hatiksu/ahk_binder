@@ -13,6 +13,10 @@ class BinderView extends BinderFeatures {
         this.profileButton.OnEvent('Click', this.ProfileMenu.Bind(this))
         this.pages := Map(), this.nav := Map()
         this.tables := Map()
+        this.switchingPage := false
+        this.refreshing := false
+        this.queuedPage := ''
+        this.pageDispatch := this.DispatchQueuedPage.Bind(this)
         names := ['Основное', 'Оверлеи', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Настройки']
         symbols := ['⌂', '▱', '⌨', 'ϟ', '▣', '⚙']
         for i, name in names {
@@ -110,12 +114,23 @@ class BinderView extends BinderFeatures {
     }
 
     TableVisible(c, visible) {
-        c.Visible := visible
+        this.SetVisible(c, visible)
         table := this.tables[c.Hwnd]
         if table.panel
-            table.panel.Visible := visible
+            this.SetVisible(table.panel, visible)
         for label in table.labels
-            label.Visible := visible
+            this.SetVisible(label, visible)
+    }
+
+    SetVisible(control, visible) {
+        if control is ScrollPage {
+            if control.Visible != visible
+                control.Visible := visible
+        } else {
+            shown := DllCall('GetWindowLongPtr', 'ptr', control.Hwnd, 'int', -16, 'ptr') & 0x10000000
+            if (shown != 0) != visible
+                control.Visible := visible
+        }
     }
 
     Label(page, x, y, w, text, size := 10, color := 'EEEEF2', weight := 400, h := 24) {
@@ -355,68 +370,128 @@ class BinderView extends BinderFeatures {
     }
 
     ShowPage(name, *) {
-        this.currentPage := name
-        for page, controls in this.pages {
-            for control in controls
-                control.Visible := page = name
+        if this.switchingPage || this.refreshing {
+            this.queuedPage := name
+            return
         }
-        for label, button in this.nav
-            Theme.Select(button, label = name)
-        subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
-            'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
-            'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
-            'Change Log', 'История обновлений Binder by Hatiksu', 'Гайд', 'Как настроить и использовать Binder by Hatiksu')
-        this.pageTitle.Text := name
-        this.pageSubtitle.Text := subtitles[name]
-        this.EmptyStates()
-        if name = 'Репорты' || name = 'Основное'
-            this.UpdateStats()
-        if name = 'Настройки' {
-            this.factionId.Value := IniRead(this.ini, 'FactionIDs', this.faction, '')
-            this.factionLabel.Text := 'Для выбранной фракции: ' this.faction
+        previous := this.HasOwnProp('visiblePage') ? this.visiblePage : ''
+        if previous = name
+            return
+        this.switchingPage := true
+        visible := DllCall('GetWindowLongPtr', 'ptr', this.window.Hwnd, 'int', -16, 'ptr') & 0x10000000
+        if visible
+            DllCall('SendMessageW', 'ptr', this.window.Hwnd, 'uint', 0xB, 'uptr', 0, 'ptr', 0)
+        try {
+            SetTimer this.searchRefresh, 0
+            if previous != '' {
+                for control in this.pages[previous]
+                    this.SetVisible(control, false)
+            } else {
+                for page, controls in this.pages {
+                    if page != name {
+                        for control in controls
+                            this.SetVisible(control, false)
+                    }
+                }
+            }
+            this.currentPage := name
+            this.visiblePage := name
+            for control in this.pages[name]
+                this.SetVisible(control, true)
+            if this.nav.Has(previous)
+                Theme.Select(this.nav[previous], false)
+            if this.nav.Has(name)
+                Theme.Select(this.nav[name], true)
+            subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
+                'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
+                'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
+                'Change Log', 'История обновлений Binder by Hatiksu', 'Гайд', 'Как настроить и использовать Binder by Hatiksu')
+            this.pageTitle.Text := name
+            this.pageSubtitle.Text := subtitles[name]
+            if name = 'Триггеры'
+                this.Refresh()
+            else
+                this.EmptyStates()
+            if name = 'Репорты' || name = 'Основное'
+                this.UpdateStats()
+            if name = 'Настройки' {
+                this.factionId.Value := IniRead(this.ini, 'FactionIDs', this.faction, '')
+                this.factionLabel.Text := 'Для выбранной фракции: ' this.faction
+            }
+        } finally {
+            if visible {
+                DllCall('SendMessageW', 'ptr', this.window.Hwnd, 'uint', 0xB, 'uptr', 1, 'ptr', 0)
+                DllCall('RedrawWindow', 'ptr', this.window.Hwnd, 'ptr', 0, 'ptr', 0, 'uint', 0x85)
+            }
+            this.switchingPage := false
+            if this.queuedPage != ''
+                SetTimer this.pageDispatch, -1
         }
     }
 
+    DispatchQueuedPage() {
+        if this.switchingPage || this.refreshing
+            return
+        target := this.queuedPage
+        this.queuedPage := ''
+        if target != ''
+            this.ShowPage(target)
+    }
+
     Refresh() {
-        SetTimer this.searchRefresh, 0
-        needle := this.search.Value
-        category := this.category.Text
-        signature := this.configRevision '|' needle '|' category
-        if !this.HasOwnProp('listSignature') || this.listSignature != signature {
-            visible := DllCall('GetWindowLongPtr', 'ptr', this.list.Hwnd, 'int', -16, 'ptr') & 0x10000000
-            SendMessage 0xB, 0, 0, this.list
-            try {
-                this.list.Delete()
-                this.rows := []
-                for item in this.config.entries {
-                    if category != 'Все категории' && category != item.category
-                        continue
-                    if needle != '' && !InStr(item.key ' ' item.text ' ' item.category, needle)
-                        continue
-                    this.rows.Push(item)
-                    this.list.Add(, item.key, item.text, item.category)
+        if this.refreshing {
+            SetTimer this.searchRefresh, -140
+            return
+        }
+        this.refreshing := true
+        try {
+            SetTimer this.searchRefresh, 0
+            needle := this.search.Value
+            category := this.category.Text
+            signature := this.configRevision '|' needle '|' category
+            if !this.HasOwnProp('listSignature') || this.listSignature != signature {
+                visible := DllCall('GetWindowLongPtr', 'ptr', this.list.Hwnd, 'int', -16, 'ptr') & 0x10000000
+                SendMessage 0xB, 0, 0, this.list
+                try {
+                    this.list.Delete()
+                    this.rows := []
+                    drawRows := []
+                    for item in this.config.entries {
+                        if category != 'Все категории' && category != item.category
+                            continue
+                        if needle != '' && !InStr(item.key ' ' item.text ' ' item.category, needle)
+                            continue
+                        this.rows.Push(item)
+                        drawRows.Push([item.key, item.text, item.category])
+                        this.list.Add(, item.key, item.text, item.category)
+                    }
+                    this.Columns(this.list, [140, 480, 192])
+                    Theme.SetListData(this.list, drawRows)
+                    this.listSignature := signature
+                } finally {
+                    SendMessage 0xB, 1, 0, this.list
+                    this.list.Visible := visible != 0
+                    this.list.Redraw()
                 }
-                this.Columns(this.list, [140, 480, 192])
-                this.listSignature := signature
-            } finally {
-                SendMessage 0xB, 1, 0, this.list
-                this.list.Visible := visible != 0
-                this.list.Redraw()
             }
-        }
-        bindings := ''
-        for item in this.binds
-            bindings .= item.key '`t' item.text '`n'
-        if !this.HasOwnProp('bindSignature') || bindings != this.bindSignature {
-            this.bindList.Delete()
+            bindings := ''
             for item in this.binds
-                this.bindList.Add(, KeyLabel(item.key), item.text)
-            this.Columns(this.bindList, [220, 592])
-            this.bindSignature := bindings
+                bindings .= item.key '`t' item.text '`n'
+            if !this.HasOwnProp('bindSignature') || bindings != this.bindSignature {
+                this.bindList.Delete()
+                for item in this.binds
+                    this.bindList.Add(, KeyLabel(item.key), item.text)
+                this.Columns(this.bindList, [220, 592])
+                this.bindSignature := bindings
+            }
+            this.count.Text := 'Показано: ' this.rows.Length ' из ' this.config.entries.Length '    •    Набор: ' (this.gender = 'male' ? 'мужской' : 'женский') '    •    Замечаний: ' this.config.problems.Length
+            this.UpdateStats()
+            this.EmptyStates()
+        } finally {
+            this.refreshing := false
+            if this.queuedPage != '' && !this.switchingPage
+                SetTimer this.pageDispatch, -1
         }
-        this.count.Text := 'Показано: ' this.rows.Length ' из ' this.config.entries.Length '    •    Набор: ' (this.gender = 'male' ? 'мужской' : 'женский') '    •    Замечаний: ' this.config.problems.Length
-        this.UpdateStats()
-        this.EmptyStates()
     }
 
     ScheduleSearch(*) {
@@ -426,18 +501,18 @@ class BinderView extends BinderFeatures {
     EmptyStates() {
         name := this.currentPage
         this.TableVisible(this.list, name = 'Триггеры' && this.rows.Length > 0)
-        this.triggerEmpty.Visible := name = 'Триггеры' && this.rows.Length = 0
+        this.SetVisible(this.triggerEmpty, name = 'Триггеры' && this.rows.Length = 0)
         empty := name = 'Бинды клавиш' && this.binds.Length = 0
         this.TableVisible(this.bindList, name = 'Бинды клавиш' && !empty)
         for c in [this.bindEmptyPanel, this.bindEmptyIcon, this.bindEmptyTitle, this.bindEmptyHint]
-            c.Visible := empty
+            this.SetVisible(c, empty)
         empty := name = 'Оверлеи' && this.customOverlays.Length = 0
         this.TableVisible(this.customList, name = 'Оверлеи' && !empty)
-        this.customEmptyPanel.Visible := empty
-        this.customEmpty.Visible := empty
-        this.customEmptyIcon.Visible := empty
+        this.SetVisible(this.customEmptyPanel, empty)
+        this.SetVisible(this.customEmpty, empty)
+        this.SetVisible(this.customEmptyIcon, empty)
         for button in this.overlayActions
-            button.Visible := name = 'Оверлеи' && !empty
+            this.SetVisible(button, name = 'Оверлеи' && !empty)
     }
 
     BuildChangelog() {
