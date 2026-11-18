@@ -1,4 +1,10 @@
 class BinderFeatures {
+    static factionIDs := Map('LSPD', 1, 'EMS', 2, 'LSCSD', 3, 'SANG', 4, 'GOV', 5, 'WN', 6, 'FIB', 7, 'BALLAS', 8, 'VAGOS', 9, 'FAM', 10, 'BLOODS', 11, 'MARA', 12)
+
+    GetFactionID(name := '') {
+        return BinderFeatures.factionIDs.Get(name = '' ? this.faction : name, '')
+    }
+
     InitProfile() {
         this.rootDir := A_ScriptDir '\data'
         if A_Args.Length && A_Args[1] = '--check'
@@ -12,7 +18,7 @@ class BinderFeatures {
         DirCreate this.dir
         this.ini := this.dir '\settings.ini'
         this.faction := IniRead(this.ini, 'General', 'Faction', 'Все')
-        if !InStr('|LSPD|FIB|SANG|LSCSD|GOV|EMS|WN|Все|', '|' this.faction '|')
+        if this.faction != 'Все' && !BinderFeatures.factionIDs.Has(this.faction)
             this.faction := 'Все'
         this.esp := IniRead(this.ini, 'General', 'ESP', '3')
         this.overlayWindows := []
@@ -98,17 +104,17 @@ class BinderFeatures {
         for label, button in this.factionButtons
             Theme.Select(button, label != 'Все' && label = name)
         this.factionButtons['Все'].Text := 'Все'
-        this.factionId.Value := IniRead(this.ini, 'FactionIDs', name, '')
+        this.factionId.Value := this.GetFactionID(name)
         this.factionLabel.Text := 'Для выбранной фракции: ' name
     }
 
     IsExtraFaction(name) {
-        return name = 'GOV' || name = 'EMS' || name = 'WN'
+        return InStr('|GOV|EMS|WN|BALLAS|VAGOS|FAM|BLOODS|MARA|', '|' name '|') != 0
     }
 
     ChooseExtraFaction() {
         current := this.IsExtraFaction(this.faction) ? this.faction : 'GOV'
-        selected := DarkDialog.Choice('Остальные фракции', ['GOV', 'EMS', 'WN'], current)
+        selected := DarkDialog.Choice('Остальные фракции', ['GOV', 'EMS', 'WN', 'BALLAS', 'VAGOS', 'FAM', 'BLOODS', 'MARA'], current)
         if selected != ''
             this.SetFaction(selected)
     }
@@ -201,7 +207,7 @@ class BinderFeatures {
         this.reportWeek.Text := stats.week
         this.reportProgress.Value := Min(100, Round(stats.day / this.norm * 100))
         weekend := FormatTime(, 'WDay') = '1' || FormatTime(, 'WDay') = '7'
-        this.reportHint.Text := 'Выполнено ' Round(stats.day / this.norm * 100) '%  ·  ' (weekend ? 'Норма выходного дня' : 'Норма буднего дня') ': ' this.norm
+        this.reportHint.Text := 'Выполнено ' Round(stats.day / this.norm * 100) '% · ' (weekend ? 'Норма выходного дня' : 'Норма буднего дня') ': ' this.norm
         loop 14 {
             date := DateAdd(A_Now, -(A_Index - 1), 'Days')
             key := FormatTime(date, 'yyyyMMdd')
@@ -225,7 +231,7 @@ class BinderFeatures {
     ToggleReportOverlay(*) {
         this.overlayEnabled := !this.overlayEnabled
         IniWrite this.overlayEnabled ? 1 : 0, this.ini, 'Overlay', 'Enabled'
-        this.overlayToggle.Text := this.overlayEnabled ? '●  Включён' : '○  Выключен'
+        this.overlayToggle.Text := this.overlayEnabled ? '● Включён' : '○ Выключен'
         Theme.Select(this.overlayToggle, this.overlayEnabled)
         this.RenderOverlays()
     }
@@ -344,7 +350,7 @@ class BinderFeatures {
     RefreshOverlayList() {
         this.customList.Delete()
         for item in this.customOverlays
-            this.customList.Add(, item.enabled ? '●' : '○', item.name, item.key = '' ? '—' : KeyLabel(item.key), item.image = '' ? 'Текст' : 'Картинка + текст')
+            this.customList.Add(, item.enabled ? '●' : '○', item.name, item.key = '' ? '-' : KeyLabel(item.key), item.image = '' ? 'Текст' : 'Картинка + текст')
         this.Columns(this.customList, [40, 330, 200, 242])
         this.EmptyStates()
         this.BindOverlayKeys()
@@ -464,7 +470,7 @@ class BinderFeatures {
     }
 
     ReportOverlayText(stats) {
-        return this.overlayStyle = 'compact' ? 'РЕПОРТЫ   ' stats.day ' / ' this.norm '     •     НЕДЕЛЯ   ' stats.week : 'Репорты за день: ' stats.day ' / ' this.norm '`nЗа неделю: ' stats.week
+        return this.overlayStyle = 'compact' ? 'РЕПОРТЫ ' stats.day ' / ' this.norm ' • НЕДЕЛЯ ' stats.week : 'Репорты за день: ' stats.day ' / ' this.norm '`nЗа неделю: ' stats.week
     }
 
     UpdateOverlayText() {
@@ -489,9 +495,14 @@ class BinderFeatures {
     PrepareCommands(text) {
         text := StrReplace(text, '%faction%', this.faction)
         text := StrReplace(text, '%esp%', this.esp)
-        id := IniRead(this.ini, 'FactionIDs', this.faction, '')
-        if this.faction != 'Все' && id != '' && RegExMatch(text, 'i)^/templeader(?=\{space\}|$)')
-            text := RegExReplace(text, 'i)^/templeader', '/templeader ' id)
+        id := this.GetFactionID()
+        if id != '' {
+            text := RegExReplace(text, 'i)^/templeader(?:\s+\d+)?(?=\{space\}|\{|$|\s)', '/templeader ' id)
+            if RegExMatch(text, 'i)^/prange\s+(\d+)(?:\s+\d+)?(?=\{|$|\s)', &command) {
+                distance := command[1]
+                text := RegExReplace(text, 'i)^/prange\s+\d+(?:\s+\d+)?(?=\{|$|\s)', '/prange ' distance ' ' id)
+            }
+        }
         text := RegExReplace(text, 'i)^/esp(?:\s+\d+)?(?=\{|$|\s)', '/esp ' this.esp)
         return text
     }

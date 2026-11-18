@@ -34,7 +34,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.8.1'
+        this.version := '0.8.2'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -215,7 +215,7 @@ class Binder extends BinderView {
             DarkDialog.Message 'В файле нет распознанных триггеров. Текущий конфиг сохранён.'
             return
         }
-        mode := DarkDialog.Message('Найдено: ' incoming.entries.Length '. Замечаний: ' incoming.problems.Length '.`nДа — заменить текущий набор.`nНет — объединить (существующие триггеры имеют приоритет).`nОтмена — ничего не менять.', 'Импорт', 'YesNoCancel')
+        mode := DarkDialog.Message('Найдено: ' incoming.entries.Length '. Замечаний: ' incoming.problems.Length '.`nДа - заменить текущий набор.`nНет - объединить (существующие триггеры имеют приоритет).`nОтмена - ничего не менять.', 'Импорт', 'YesNoCancel')
         if mode = 'Cancel'
             return
         if mode = 'Yes'
@@ -317,7 +317,6 @@ class Binder extends BinderView {
         }
         this.process := Trim(this.exe.Value)
         IniWrite this.process, this.ini, 'General', 'Process'
-        IniWrite this.factionId.Value, this.ini, 'FactionIDs', this.faction
         for name, field in this.variables
             IniWrite field.Value, this.ini, 'Variables', name
         this.Refresh()
@@ -560,7 +559,7 @@ RunChecks() {
         if app.currentPage != name
             throw Error('Не работает кнопка раздела: ' name)
     }
-    CheckClickText(app, 'Основное', '▤  Change Log')
+    CheckClickText(app, 'Основное', '▤ Change Log')
     if app.currentPage != 'Change Log'
         throw Error('Не работает страница Change Log')
     CheckClickText(app, 'Change Log', '← На главную')
@@ -624,7 +623,7 @@ RunChecks() {
         if app.faction != faction
             throw Error('Не работает кнопка фракции: ' faction)
     }
-    for extra in ['GOV', 'EMS', 'WN'] {
+    for extra in ['GOV', 'EMS', 'WN', 'BALLAS', 'VAGOS', 'FAM', 'BLOODS', 'MARA'] {
         app.SetFaction(extra)
         if app.factionButtons['Все'].Text != 'Все' || Theme.items[app.factionButtons['Все'].Hwnd].selected || IniRead(app.ini, 'General', 'Faction') != extra
             throw Error('Не работает дополнительная фракция ' extra)
@@ -637,6 +636,13 @@ RunChecks() {
     CheckClick(app.factionButtons['Все'])
     if app.faction != 'EMS'
         throw Error('Отмена выбора изменила фракцию')
+    for faction, id in BinderFeatures.factionIDs {
+        app.SetFaction(faction)
+        if app.PrepareCommands('/templeader{space}') != '/templeader ' id '{space}' || app.PrepareCommands('/templeader 99') != '/templeader ' id
+            throw Error('Неверный ID /templeader: ' faction)
+        if app.PrepareCommands('/prange 1000 99') != '/prange 1000 ' id || app.PrepareCommands('/prange 500') != '/prange 500 ' id
+            throw Error('Неверный ID /prange: ' faction)
+    }
     app.SetFaction('LSPD')
     CheckClick(app.genderButtons['female'])
     if app.gender != 'female'

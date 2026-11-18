@@ -137,7 +137,7 @@ class DarkDialog {
             try {
                 loop files address.Value '*', 'D' {
                     rows.Push({path: A_LoopFileFullPath, directory: true})
-                    listing.Add(, '▸  ' A_LoopFileName, 'Папка')
+                    listing.Add(, '▸ ' A_LoopFileName, 'Папка')
                 }
                 loop files address.Value '*', 'F' {
                     SplitPath A_LoopFileName, , , &extension

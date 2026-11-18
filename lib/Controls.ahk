@@ -20,7 +20,7 @@ class KeyPicker {
     }
     Capture() {
         this.active := true
-        this.control.Text := 'Нажми сочетание…  ·  Esc — отмена'
+        this.control.Text := 'Нажми сочетание… · Esc - отмена'
         Theme.Select(this.control, true)
         this.control.Focus()
     }
@@ -92,7 +92,7 @@ class CategoryPicker {
     }
     Choose(index) {
         this.index := index
-        this.control.Text := this.Text '  ⌄'
+        this.control.Text := this.Text ' ⌄'
     }
     Select(index, *) {
         this.Choose(index)

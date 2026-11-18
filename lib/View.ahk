@@ -9,7 +9,7 @@ class BinderView extends BinderFeatures {
         brand := g.AddText('x65 y22 w175 h34 BackgroundTrans', 'Binder by Hatiksu')
         brand.SetFont('s15 w700 italic')
         brand.OnEvent('Click', (*) => PostMessage(0xA1, 2, 0, , g))
-        this.profileButton := Theme.Button(g, 'x18 y80 w210 h44', '●  ' this.profile '      ⌄', '18181A')
+        this.profileButton := Theme.Button(g, 'x18 y80 w210 h44', '● ' this.profile ' ⌄', '18181A')
         this.profileButton.OnEvent('Click', this.ProfileMenu.Bind(this))
         this.pages := Map(), this.nav := Map()
         this.tables := Map()
@@ -23,7 +23,7 @@ class BinderView extends BinderFeatures {
             y := 144 + (i - 1) * 40
             if name = 'Настройки'
                 y += 18
-            button := Theme.Button(g, 'x18 y' y ' w210 h34', symbols[i] '   ' name, '1B1B1D')
+            button := Theme.Button(g, 'x18 y' y ' w210 h34', symbols[i] ' ' name, '1B1B1D')
             Theme.items[button.Hwnd].nav := true
             button.OnEvent('Click', this.ShowPage.Bind(this, name))
             this.nav[name] := button
@@ -183,14 +183,14 @@ class BinderView extends BinderFeatures {
         }
         this.triggerStat := values[1], this.todayStat := values[2], this.weekStat := values[3]
         this.Label(page, 298, 219, 700, 'Быстрые действия', 13, , 700)
-        this.Button(page, 298, 254, 170, '▤  Change Log', (*) => this.ShowPage('Change Log'))
-        this.Button(page, 480, 254, 170, '↻  Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder/releases'))
-        this.Button(page, 662, 254, 170, '◉  Discord', (*) => Run('https://discord.gg/KtrHWbjwFY'), true)
-        this.Button(page, 844, 254, 170, 'ⓘ  Пройти гайд', this.Guide.Bind(this))
-        this.Label(page, 298, 322, 700, '⌁  Рабочее пространство', 13, , 700)
-        this.Button(page, 298, 357, 238, '▣  Открыть конфиги профиля', (*) => Run(this.dir))
-        this.Button(page, 550, 357, 238, '↗  Экспортировать триггеры', (*) => this.Export())
-        this.Label(page, 298, 423, 700, '☷  Базовые параметры', 13, , 700)
+        this.Button(page, 298, 254, 170, '▤ Change Log', (*) => this.ShowPage('Change Log'))
+        this.Button(page, 480, 254, 170, '↻ Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder/releases'))
+        this.Button(page, 662, 254, 170, '◉ Discord', (*) => Run('https://discord.gg/KtrHWbjwFY'), true)
+        this.Button(page, 844, 254, 170, 'ⓘ Пройти гайд', this.Guide.Bind(this))
+        this.Label(page, 298, 322, 700, '⌁ Рабочее пространство', 13, , 700)
+        this.Button(page, 298, 357, 238, '▣ Открыть конфиги профиля', (*) => Run(this.dir))
+        this.Button(page, 550, 357, 238, '↗ Экспортировать триггеры', (*) => this.Export())
+        this.Label(page, 298, 423, 700, '☷ Базовые параметры', 13, , 700)
         this.Label(page, 302, 465, 510, 'Фракция для /templeader', 9, 'B8B8C0', 600)
         this.Label(page, 856, 465, 270, 'Род написания триггеров', 9, 'B8B8C0', 600)
         this.factionButtons := Map()
@@ -279,10 +279,10 @@ class BinderView extends BinderFeatures {
         this.Label(page, 298, 178, 800, 'Имя процесса игры', 10, 'B8B8C0')
         this.exe := this.Add(page, 'Edit', 'x298 y205 w450 h32', this.process)
         this.Label(page, 298, 253, 800, 'Бинды клавиш работают только в этом процессе. Триггеры доступны в любых чатах.', 9, '8F8F9B')
-        this.Label(page, 298, 305, 800, 'ID фракции для /templeader', 10, 'B8B8C0')
-        this.factionId := this.Add(page, 'Edit', 'x298 y333 w180 h32', IniRead(this.ini, 'FactionIDs', this.faction, ''))
+        this.Label(page, 298, 305, 800, 'ID выбранной фракции', 10, 'B8B8C0')
+        this.factionId := this.Add(page, 'Edit', 'x298 y333 w180 h32 ReadOnly', this.GetFactionID())
         this.factionLabel := this.Label(page, 498, 337, 620, 'Для выбранной фракции: ' this.faction, 9, '8F8F9B')
-        this.Label(page, 298, 384, 800, 'Без ID команда /templeader остаётся без аргумента. ID не угадываются.', 9, '8F8F9B')
+        this.Label(page, 298, 384, 800, 'ID подставляется автоматически в /templeader и /prange в триггерах и биндах.', 9, '8F8F9B')
         this.Label(page, 298, 441, 800, 'Профиль: ' this.profile, 13, , 700)
         this.Label(page, 298, 481, 800, 'У каждого профиля свои наборы, бинды, Discord, репорты и оверлеи.`nНастройки хранятся локально и не публикуются в GitHub.', 10, 'A9A9B3', , 55)
         this.Button(page, 298, 571, 240, 'Сохранить настройки', (*) => this.SaveSettings(), true)
@@ -297,7 +297,7 @@ class BinderView extends BinderFeatures {
         this.Button(page, 320, 171, 46, '▣', (*) => this.ShowPage('Репорты'), true, 46)
         this.Label(page, 384, 150, 240, 'Счётчик репортов', 12, , 700)
         this.Label(page, 384, 181, 210, 'Выводит на экран`nколичество репортов`nи норму на день', 10, 'B0B0B8', , 64)
-        this.overlayToggle := this.Button(page, 616, 174, 136, this.overlayEnabled ? '●  Включён' : '○  Выключен', this.ToggleReportOverlay.Bind(this), false, 38)
+        this.overlayToggle := this.Button(page, 616, 174, 136, this.overlayEnabled ? '● Включён' : '○ Выключен', this.ToggleReportOverlay.Bind(this), false, 38)
         Theme.Select(this.overlayToggle, this.overlayEnabled)
         this.Button(page, 768, 174, 108, 'К репортам', (*) => this.ShowPage('Репорты'))
         this.moveButton := this.Button(page, 888, 174, 128, '✥ Переместить', this.MoveOverlays.Bind(this), true)
@@ -412,7 +412,7 @@ class BinderView extends BinderFeatures {
             if name = 'Репорты' || name = 'Основное'
                 this.UpdateStats()
             if name = 'Настройки' {
-                this.factionId.Value := IniRead(this.ini, 'FactionIDs', this.faction, '')
+                this.factionId.Value := this.GetFactionID()
                 this.factionLabel.Text := 'Для выбранной фракции: ' this.faction
             }
         } finally {
@@ -481,7 +481,7 @@ class BinderView extends BinderFeatures {
                 this.Columns(this.bindList, [220, 592])
                 this.bindSignature := bindings
             }
-            this.count.Text := 'Показано: ' this.rows.Length ' из ' this.config.entries.Length '    •    Набор: ' (this.gender = 'male' ? 'мужской' : 'женский') '    •    Замечаний: ' this.config.problems.Length
+            this.count.Text := 'Показано: ' this.rows.Length ' из ' this.config.entries.Length ' • Набор: ' (this.gender = 'male' ? 'мужской' : 'женский') ' • Замечаний: ' this.config.problems.Length
             this.UpdateStats()
             this.EmptyStates()
         } finally {
@@ -529,13 +529,13 @@ class BinderView extends BinderFeatures {
         this.Button(page, 298, 125, 144, '← На главную', (*) => this.ShowPage('Основное'))
         this.guideScroll := ScrollPage(this.window, 298, 180, 832, 507)
         steps := [
-            ['01  Профиль и персонаж', ['Выбери профиль в меню слева сверху. Каждый профиль хранит свои триггеры, бинды, оверлеи и статистику.', 'На главной выбери пол, фракцию LSPD / FIB / SANG / LSCSD и тип /esp. Discord-поля сохраняются сразу.']],
-            ['02  Триггеры', ['Открой нужный чат, введи сокращение и нажми пробел. Например: .ку. Маркер {rep} отправит готовый ответ, а {enter}{rep} не отправит его дважды.', 'Кнопка «Проверить» открывает локальный чат без отправки сообщений наружу. В редакторах конфигов подстановка отключена, чтобы не мешать изменениям.']],
-            ['03  Бинды клавиш', ['Нажми «Добавить бинд», затем поле клавиш и введи сочетание. Esc отменяет запись, Backspace очищает поле.', 'Бинд открывает чат клавишей T и вставляет шаблон. Добавь {enter} в конце, если сообщение нужно отправить сразу.']],
-            ['04  Нормы и репорты', ['В разделе «Репорты» отдельно укажи нормы для будней и выходных и нажми «Сохранить». Суббота и воскресенье считаются выходными.', 'Маркер {rep} отправляет готовое сообщение в активном чате. Счётчик автоматически увеличивается после подтверждённого закрытия обращения.']],
-            ['05  Оверлеи', ['Включи счётчик или создай плашку с текстом и изображением. Поддерживаются {today}, {week}, {norm} и Discord-поля.', 'Нажми «Переместить», перетащи плашки и нажми «Готово». Оверлеи рассчитаны на оконный режим игры или режим без рамки.']],
-            ['06  Настройки игры', ['Укажи имя процесса игры, если оно отличается от GTA5.exe. Бинды работают только в этом процессе, триггеры — в любых чатах.', 'Фракция, тип /esp и Discord-поля сохраняются в профиле и восстанавливаются после перезапуска. Кнопка «Все» сохраняет своё название.']],
-            ['07  Обновление', ['Кнопка «Обновления» открывает GitHub Releases. Скачай архив новой версии, закрой скрипт и распакуй исходники.', 'Сохрани папку data при обновлении: в ней находятся личные конфиги и статистика. Поддержка — по кнопке Discord на главной.']]]
+            ['01 Профиль и персонаж', ['Выбери профиль в меню слева сверху. Каждый профиль хранит свои триггеры, бинды, оверлеи и статистику.', 'На главной выбери пол, фракцию LSPD / FIB / SANG / LSCSD и тип /esp. Discord-поля сохраняются сразу.']],
+            ['02 Триггеры', ['Открой нужный чат, введи сокращение и нажми пробел. Например: .ку. Маркер {rep} отправит готовый ответ, а {enter}{rep} не отправит его дважды.', 'Кнопка «Проверить» открывает локальный чат без отправки сообщений наружу. В редакторах конфигов подстановка отключена, чтобы не мешать изменениям.']],
+            ['03 Бинды клавиш', ['Нажми «Добавить бинд», затем поле клавиш и введи сочетание. Esc отменяет запись, Backspace очищает поле.', 'Бинд открывает чат клавишей T и вставляет шаблон. Добавь {enter} в конце, если сообщение нужно отправить сразу.']],
+            ['04 Нормы и репорты', ['В разделе «Репорты» отдельно укажи нормы для будней и выходных и нажми «Сохранить». Суббота и воскресенье считаются выходными.', 'Маркер {rep} отправляет готовое сообщение в активном чате. Счётчик автоматически увеличивается после подтверждённого закрытия обращения.']],
+            ['05 Оверлеи', ['Включи счётчик или создай плашку с текстом и изображением. Поддерживаются {today}, {week}, {norm} и Discord-поля.', 'Нажми «Переместить», перетащи плашки и нажми «Готово». Оверлеи рассчитаны на оконный режим игры или режим без рамки.']],
+            ['06 Настройки игры', ['Укажи имя процесса игры, если оно отличается от GTA5.exe. Бинды работают только в этом процессе, триггеры - в любых чатах.', 'Фракция, тип /esp и Discord-поля сохраняются в профиле и восстанавливаются после перезапуска. Кнопка «Все» сохраняет своё название.']],
+            ['07 Обновление', ['Кнопка «Обновления» открывает GitHub Releases. Скачай архив новой версии, закрой скрипт и распакуй исходники.', 'Сохрани папку data при обновлении: в ней находятся личные конфиги и статистика. Поддержка - по кнопке Discord на главной.']]]
         for step in steps
             this.guideScroll.AddCard(step[1], step[2])
         this.guideScroll.Finish()

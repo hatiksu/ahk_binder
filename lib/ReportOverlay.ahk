@@ -10,7 +10,7 @@ class ReportOverlay {
         this.width := compact ? 356 : 292
         this.height := compact ? 88 : 144
         g.AddText('x0 y6 w3 h48 BackgroundA78BFA', '')
-        this.Label(14, 4, 200, 'РЕПОРТЫ  /  СЕГОДНЯ', 8, 'D8C9FF')
+        this.Label(14, 4, 200, 'РЕПОРТЫ / СЕГОДНЯ', 8, 'D8C9FF')
         this.day := this.Label(14, 22, 190, '', 23, 'FFFFFF', 40)
         weekX := compact ? 234 : 14
         weekY := compact ? 4 : 69
