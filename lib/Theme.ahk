@@ -38,7 +38,7 @@ class Theme {
 
     static Attach(c, color, panel) {
         if !this.proc
-            this.proc := CallbackCreate(this.Subclass.Bind(this), 'Fast', 6)
+            this.proc := CallbackCreate(this.Subclass.Bind(this), '', 6)
         this.items[c.Hwnd] := {control: c, color: color, selected: false, panel: panel, hover: false}
         this.items[c.Hwnd].nav := false
         if !DllCall('comctl32\SetWindowSubclass', 'ptr', c.Hwnd, 'ptr', this.proc, 'uptr', 1, 'uptr', 0)
@@ -52,6 +52,9 @@ class Theme {
     }
 
     static Subclass(hwnd, msg, wp, lp, id, data) {
+        ; Сообщения приходят и во время обработки других событий GUI.
+        ; Отдельный контекст не меняет состояние прерванного обработчика.
+        Critical 100
         if !this.items.Has(hwnd)
             return DllCall('comctl32\DefSubclassProc', 'ptr', hwnd, 'uint', msg, 'uptr', wp, 'ptr', lp, 'ptr')
         item := this.items[hwnd]
@@ -222,6 +225,7 @@ class Theme {
     }
 
     static ListDraw(c, notification) {
+        Critical 100
         stageOffset := A_PtrSize = 8 ? 24 : 12
         stage := NumGet(notification, stageOffset, 'uint')
         if stage = 1 {
@@ -231,6 +235,21 @@ class Theme {
             ; Отрисовываем содержимое целиком; выбор и прокрутка остаются системными.
             return 4
         }
+    }
+
+    ; Прямое чтение ListView не запускает очередь событий AHK внутри отрисовки.
+    static ListMessage(c, message, wp := 0, lp := 0) {
+        return DllCall('SendMessageW', 'ptr', c.Hwnd, 'uint', message, 'uptr', wp, 'ptr', lp, 'ptr')
+    }
+
+    static ListText(c, row, column) {
+        text := Buffer(65536, 0)
+        item := Buffer(A_PtrSize = 8 ? 88 : 60, 0)
+        NumPut('int', column, item, 8)
+        NumPut('ptr', text.Ptr, item, A_PtrSize = 8 ? 24 : 20)
+        NumPut('int', text.Size // 2, item, A_PtrSize = 8 ? 32 : 24)
+        this.ListMessage(c, 0x1073, row, item.Ptr)
+        return StrGet(text)
     }
 
     static PaintList(c, dc) {
@@ -245,28 +264,28 @@ class Theme {
         font := DllCall('SendMessageW', 'ptr', c.Hwnd, 'uint', 0x31, 'uptr', 0, 'ptr', 0, 'ptr')
         DllCall('SelectObject', 'ptr', dc, 'ptr', font)
         DllCall('SetBkMode', 'ptr', dc, 'int', 1)
-        top := SendMessage(0x1027, 0, 0, c)
-        visible := SendMessage(0x1028, 0, 0, c) + 1
+        top := this.ListMessage(c, 0x1027)
+        visible := this.ListMessage(c, 0x1028) + 1
         cached := this.listData.Get(c.Hwnd, 0)
-        count := cached ? cached.Length : c.GetCount()
+        count := cached ? cached.Length : this.ListMessage(c, 0x1004)
         widths := []
         loop this.listColumns[c.Hwnd]
-            widths.Push(SendMessage(0x101D, A_Index - 1, 0, c))
+            widths.Push(this.ListMessage(c, 0x101D, A_Index - 1))
         offset := DllCall('GetScrollPos', 'ptr', c.Hwnd, 'int', 0)
         loop Min(visible, count - top) {
             row := top + A_Index - 1
             rect := Buffer(16, 0)
-            SendMessage 0x100E, row, rect.Ptr, c
+            this.ListMessage(c, 0x100E, row, rect.Ptr)
             y := NumGet(rect, 4, 'int'), bottom := NumGet(rect, 12, 'int')
             NumPut('int', 0, rect, 0)
             NumPut('int', width, rect, 8)
-            selected := SendMessage(0x102C, row, 2, c) & 2
+            selected := this.ListMessage(c, 0x102C, row, 2) & 2
             brush := selected ? brushes[3] : brushes[1 + Mod(row, 2)]
             DllCall('FillRect', 'ptr', dc, 'ptr', rect, 'ptr', brush)
             DllCall('SetTextColor', 'ptr', dc, 'uint', this.Color(selected ? 'CDBFFF' : 'DEDEE7'))
             x := -offset
             for column, cellWidth in widths {
-                text := cached ? cached[row + 1][column] : c.GetText(row + 1, column)
+                text := cached ? cached[row + 1][column] : this.ListText(c, row, column - 1)
                 NumPut('int', x + 14, 'int', y, 'int', x + cellWidth - 12, 'int', bottom, rect)
                 DllCall('DrawTextW', 'ptr', dc, 'str', text, 'int', -1, 'ptr', rect, 'uint', 0x8824)
                 x += cellWidth

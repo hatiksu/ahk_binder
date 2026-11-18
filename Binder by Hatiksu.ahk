@@ -31,7 +31,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.7.1'
+        this.version := '0.7.2'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -544,6 +544,10 @@ RunChecks() {
         if !InStr(row.key ' ' row.text ' ' row.category, '/ltk')
             throw Error('Search filtering failed')
     }
+    for column in [1, 2, 3] {
+        if Theme.ListText(app.list, 0, column - 1) != app.list.GetText(1, column)
+            throw Error('Прямое чтение ячейки отличается от текста ListView')
+    }
     FileAppend 'OK: duplicate detection, malformed lines, action preservation, pages, search`n', '*'
     for name in ['Оверлеи', 'Репорты', 'Бинды клавиш', 'Триггеры', 'Настройки', 'Основное'] {
         CheckClick(app.nav[name])
@@ -849,26 +853,74 @@ if A_Args.Length && A_Args[1] = '--profile-ui' {
 
 WaitForProfileWindow(app) {
     global uiProfilePoll
-    if !WinActive('ahk_id ' app.window.Hwnd)
+    if !DllCall('IsWindowVisible', 'ptr', app.window.Hwnd)
         return
     SetTimer uiProfilePoll, 0
     RunNavigationProfile(app)
 }
 
 RunNavigationProfile(app) {
-    label := A_Args.Length >= 2 ? A_Args[2] : 'navigation'
-    path := A_ScriptDir '\work\ui-profile-' RegExReplace(label, '[^a-zA-Z0-9_-]') '.txt'
-    if FileExist(path)
-        FileDelete path
-    DllCall('QueryPerformanceFrequency', 'int64*', &frequency := 0)
-    for name in ['Триггеры', 'Основное', 'Триггеры', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Триггеры', 'Настройки', 'Основное'] {
-        FileAppend 'START ' name '`n', path, 'UTF-8'
-        DllCall('QueryPerformanceCounter', 'int64*', &started := 0)
-        app.ShowPage(name)
-        DllCall('RedrawWindow', 'ptr', app.window.Hwnd, 'ptr', 0, 'ptr', 0, 'uint', 0x185)
-        DllCall('QueryPerformanceCounter', 'int64*', &finished := 0)
-        FileAppend Format('{:.2f}', (finished - started) * 1000 / frequency) ' ms ' name '`n', path, 'UTF-8'
-        Sleep 80
+    NavigationProfile(app)
+}
+
+; Измеряем путь через очередь Windows и обработчик Click, а не прямой ShowPage.
+class NavigationProfile {
+    __New(app) {
+        this.app := app
+        label := A_Args.Length >= 2 ? A_Args[2] : 'navigation'
+        DirCreate A_ScriptDir '\work'
+        this.path := A_ScriptDir '\work\ui-profile-' RegExReplace(label, '[^a-zA-Z0-9_-]') '.txt'
+        if FileExist(this.path)
+            FileDelete this.path
+        this.names := ['Триггеры', 'Основное', 'Триггеры', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Триггеры', 'Настройки', 'Основное']
+        this.index := 0
+        this.pending := ''
+        this.completed := A_TickCount
+        this.receive := this.Complete.Bind(this)
+        for name, button in app.nav
+            button.OnEvent('Click', this.receive)
+        this.timerCallback := this.Tick.Bind(this)
+        SetTimer this.timerCallback, 20
     }
-    FileAppend 'DONE`n', path, 'UTF-8'
+
+    Tick() {
+        if this.pending != '' {
+            if A_TickCount - this.started > 3000 {
+                FileAppend 'TIMEOUT ' this.pending '`n', this.path, 'UTF-8'
+                this.Stop()
+            }
+            return
+        }
+        if A_TickCount - this.completed < 150
+            return
+        this.index += 1
+        if this.index > this.names.Length * 3 {
+            FileAppend 'DONE`n', this.path, 'UTF-8'
+            this.Stop()
+            return
+        }
+        this.pending := this.names[Mod(this.index - 1, this.names.Length) + 1]
+        this.started := A_TickCount
+        PostMessage 0xF5, 0, 0, this.app.nav[this.pending]
+    }
+
+    Complete(control, *) {
+        if this.pending = '' || control.Hwnd != this.app.nav[this.pending].Hwnd
+            return
+        if this.app.currentPage != this.pending {
+            FileAppend 'WRONG PAGE ' this.pending '`n', this.path, 'UTF-8'
+            this.Stop()
+            return
+        }
+        DllCall('RedrawWindow', 'ptr', this.app.window.Hwnd, 'ptr', 0, 'ptr', 0, 'uint', 0x185)
+        this.completed := A_TickCount
+        FileAppend (this.completed - this.started) ' ms ' this.pending '`n', this.path, 'UTF-8'
+        this.pending := ''
+    }
+
+    Stop() {
+        SetTimer this.timerCallback, 0
+        for name, button in this.app.nav
+            button.OnEvent('Click', this.receive, 0)
+    }
 }
