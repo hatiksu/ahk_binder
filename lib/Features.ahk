@@ -106,10 +106,10 @@ class BinderFeatures {
     }
 
     ChooseExtraFaction() {
-        current := this.faction = 'WN' ? 'WN — Weazel News' : (this.IsExtraFaction(this.faction) ? this.faction : 'GOV')
-        selected := DarkDialog.Choice('Остальные фракции', ['GOV', 'EMS', 'WN — Weazel News'], current)
+        current := this.IsExtraFaction(this.faction) ? this.faction : 'GOV'
+        selected := DarkDialog.Choice('Остальные фракции', ['GOV', 'EMS', 'WN'], current)
         if selected != ''
-            this.SetFaction(selected = 'WN — Weazel News' ? 'WN' : selected)
+            this.SetFaction(selected)
     }
 
     SetESP(number, *) {
