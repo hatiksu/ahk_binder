@@ -12,7 +12,7 @@ class BinderFeatures {
         DirCreate this.dir
         this.ini := this.dir '\settings.ini'
         this.faction := IniRead(this.ini, 'General', 'Faction', 'Все')
-        if !InStr('|LSPD|FIB|SANG|LSCSD|Все|', '|' this.faction '|')
+        if !InStr('|LSPD|FIB|SANG|LSCSD|GOV|EMS|WN|Все|', '|' this.faction '|')
             this.faction := 'Все'
         this.esp := IniRead(this.ini, 'General', 'ESP', '3')
         this.overlayWindows := []
@@ -88,11 +88,28 @@ class BinderFeatures {
     }
 
     SetFaction(name, *) {
+        if name = 'Все' {
+            this.ChooseExtraFaction()
+            return
+        }
         this.faction := name
         IniWrite name, this.ini, 'General', 'Faction'
         for label, button in this.factionButtons
-            Theme.Select(button, label = name)
+            Theme.Select(button, label = name || (label = 'Все' && this.IsExtraFaction(name)))
+        this.factionButtons['Все'].Text := this.IsExtraFaction(name) ? name : 'Все'
         this.factionId.Value := IniRead(this.ini, 'FactionIDs', name, '')
+        this.factionLabel.Text := 'Для выбранной фракции: ' name
+    }
+
+    IsExtraFaction(name) {
+        return name = 'GOV' || name = 'EMS' || name = 'WN'
+    }
+
+    ChooseExtraFaction() {
+        current := this.faction = 'WN' ? 'WN — Weazel News' : (this.IsExtraFaction(this.faction) ? this.faction : 'GOV')
+        selected := DarkDialog.Choice('Остальные фракции', ['GOV', 'EMS', 'WN — Weazel News'], current)
+        if selected != ''
+            this.SetFaction(selected = 'WN — Weazel News' ? 'WN' : selected)
     }
 
     SetESP(number, *) {

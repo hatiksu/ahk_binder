@@ -172,7 +172,9 @@ class BinderView extends BinderFeatures {
         for i, faction in ['LSPD', 'FIB', 'SANG', 'LSCSD', 'Все'] {
             b := this.Button(page, 298 + (i - 1) * 105, 492, 101, faction, this.SetFaction.Bind(this, faction), false, 36)
             this.factionButtons[faction] := b
-            Theme.Select(b, faction = this.faction)
+            Theme.Select(b, faction = this.faction || (faction = 'Все' && this.IsExtraFaction(this.faction)))
+            if faction = 'Все' && this.IsExtraFaction(this.faction)
+                b.Text := this.faction
         }
         this.genderButtons := Map()
         for i, pair in [['male', 'Мужской'], ['female', 'Женский']] {

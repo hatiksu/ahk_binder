@@ -31,7 +31,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.6.0'
+        this.version := '0.6.1'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -481,11 +481,25 @@ RunChecks() {
             throw Error('Не работает фильтр категорий')
     }
     app.category.Select(1)
-    for faction in ['LSPD', 'FIB', 'SANG', 'LSCSD', 'Все'] {
+    for faction in ['LSPD', 'FIB', 'SANG', 'LSCSD'] {
         CheckClick(app.factionButtons[faction])
         if app.faction != faction
             throw Error('Не работает кнопка фракции: ' faction)
     }
+    for extra in ['GOV', 'EMS', 'WN'] {
+        app.SetFaction(extra)
+        if app.factionButtons['Все'].Text != extra || !Theme.items[app.factionButtons['Все'].Hwnd].selected || IniRead(app.ini, 'General', 'Faction') != extra
+            throw Error('Не работает дополнительная фракция ' extra)
+    }
+    SetTimer(ChooseEMS, -100)
+    CheckClick(app.factionButtons['Все'])
+    if app.faction != 'EMS'
+        throw Error('Кнопка остальных фракций не открывает выбор')
+    SetTimer((*) => CheckClick(DarkDialog.last.buttons[2]), -100)
+    CheckClick(app.factionButtons['Все'])
+    if app.faction != 'EMS'
+        throw Error('Отмена выбора изменила фракцию')
+    app.SetFaction('LSPD')
     CheckClick(app.genderButtons['female'])
     if app.gender != 'female'
         throw Error('Не работает женский набор')
@@ -638,6 +652,11 @@ RunChecks() {
     }
     ChooseTestFile() {
         DarkDialog.last.filename.Value := A_ScriptDir '\configs\male.txt'
+        CheckClick(DarkDialog.last.buttons[1])
+    }
+    ChooseEMS() {
+        DarkDialog.last.list.Modify(1, '-Select')
+        DarkDialog.last.list.Modify(2, 'Select Focus')
         CheckClick(DarkDialog.last.buttons[1])
     }
 }
