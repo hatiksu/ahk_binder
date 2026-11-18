@@ -119,6 +119,12 @@ class BinderView extends BinderFeatures {
     }
 
     Label(page, x, y, w, text, size := 10, color := 'EEEEF2', weight := 400, h := 24) {
+        decoded := Icons.Decode(text)
+        if decoded.name != '' && decoded.label != '' {
+            icon := Theme.Icon(this.window, 'x' x ' y' y ' w22 h' Min(h, 26), decoded.name, 'B2A4DC')
+            this.pages[page].Push(icon)
+            x += 30, w -= 30, text := decoded.label
+        }
         c := this.Add(page, 'Text', 'x' x ' y' y ' w' w ' h' h ' c' color, text)
         c.SetFont('s' size ' w' weight)
         return c
@@ -228,8 +234,8 @@ class BinderView extends BinderFeatures {
         this.bindEmptyPanel := this.Card(page, 298, 173, 832, 416, '1B1B1E')
         this.bindList := this.Add(page, 'ListView', 'x298 y173 w832 h416 -Multi', ['Клавиши', 'Текст / действия'])
         this.bindList.OnEvent('DoubleClick', (*) => this.EditBind())
-        this.bindEmptyIcon := this.Label(page, 660, 280, 110, '⌨', 32, '9B86FF', , 55)
-        this.bindEmptyIcon.Opt('Center Background1B1B1E')
+        this.bindEmptyIcon := Theme.Icon(this.window, 'x685 y280 w60 h55', 'keyboard', '9B86FF', '1B1B1E')
+        this.pages[page].Push(this.bindEmptyIcon)
         this.bindEmptyTitle := this.Label(page, 460, 353, 510, 'Пока нет биндов', 16, 'EEEEF2', 600, 34)
         this.bindEmptyTitle.Opt('Center Background1B1B1E')
         this.bindEmptyHint := this.Label(page, 420, 405, 590, 'Назначь сочетание клавиш и добавь текст команды.`nНажми «Добавить бинд», чтобы создать первый.', 11, '9999A8', , 60)
@@ -281,7 +287,9 @@ class BinderView extends BinderFeatures {
         this.customEmptyPanel := this.Card(page, 298, 461, 832, 155, '1B1B1E')
         this.customList := this.Add(page, 'ListView', 'x298 y461 w832 h155 -Multi -Hdr', ['', 'Название', 'Клавиши', 'Содержимое'])
         this.customList.OnEvent('DoubleClick', (*) => this.EditOverlay())
-        this.customEmpty := this.Label(page, 335, 511, 750, '✦   Нет созданных оверлеев. Нажмите кнопку выше, чтобы добавить первый.', 10, '9999A5', , 55)
+        this.customEmptyIcon := Theme.Icon(this.window, 'x695 y484 w38 h38', 'sparkles', 'A391ED', '1B1B1E')
+        this.pages[page].Push(this.customEmptyIcon)
+        this.customEmpty := this.Label(page, 335, 539, 750, 'Нет созданных оверлеев. Нажмите кнопку выше, чтобы добавить первый.', 10, '9999A5', , 55)
         this.customEmpty.Opt('Center Background1B1B1E')
         this.overlayActions := [
             this.Button(page, 298, 641, 160, 'Изменить', (*) => this.EditOverlay()),
@@ -416,6 +424,7 @@ class BinderView extends BinderFeatures {
         this.TableVisible(this.customList, name = 'Оверлеи' && !empty)
         this.customEmptyPanel.Visible := empty
         this.customEmpty.Visible := empty
+        this.customEmptyIcon.Visible := empty
         for button in this.overlayActions
             button.Visible := name = 'Оверлеи' && !empty
     }

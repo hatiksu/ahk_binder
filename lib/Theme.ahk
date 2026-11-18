@@ -19,6 +19,14 @@ class Theme {
         return this.Attach(c, color, true)
     }
 
+    static Icon(g, options, name, tint := 'AA96FF', background := '1D1D1F') {
+        c := g.AddText(options ' +0x4000000', '')
+        this.Attach(c, background, true)
+        this.items[c.Hwnd].decoration := name
+        this.items[c.Hwnd].tint := tint
+        return c
+    }
+
     static Restack() {
         loop this.panels.Length {
             c := this.panels[this.panels.Length - A_Index + 1]
@@ -92,6 +100,16 @@ class Theme {
         rect := Buffer(16)
         DllCall('GetClientRect', 'ptr', hwnd, 'ptr', rect)
         w := NumGet(rect, 8, 'int'), h := NumGet(rect, 12, 'int')
+        if item.HasOwnProp('decoration') {
+            background := DllCall('CreateSolidBrush', 'uint', this.Color(item.color), 'ptr')
+            DllCall('FillRect', 'ptr', dc, 'ptr', rect, 'ptr', background)
+            DllCall('DeleteObject', 'ptr', background)
+            size := Min(w, h) - 4
+            Icons.Draw(dc, item.decoration, (w - size) / 2, (h - size) / 2, size, item.tint)
+            DllCall('RestoreDC', 'ptr', dc, 'int', saved)
+            DllCall('EndPaint', 'ptr', hwnd, 'ptr', paint)
+            return
+        }
         state := item.panel ? 0 : DllCall('SendMessageW', 'ptr', hwnd, 'uint', 0xF2, 'uptr', 0, 'ptr', 0, 'ptr')
         fill := item.selected ? '302848' : item.color
         edge := item.selected ? '8870FF' : (item.panel ? '343436' : '424245')
@@ -119,7 +137,29 @@ class Theme {
             DllCall('SetTextColor', 'ptr', dc, 'uint', this.Color(item.selected && !item.nav ? 'B7A5FF' : 'EEEEF2'))
             textBuffer := Buffer((DllCall('GetWindowTextLengthW', 'ptr', hwnd) + 1) * 2)
             DllCall('GetWindowTextW', 'ptr', hwnd, 'ptr', textBuffer, 'int', textBuffer.Size // 2)
-            DllCall('DrawTextW', 'ptr', dc, 'ptr', textBuffer, 'int', -1, 'ptr', rect, 'uint', 0x825)
+            rawText := StrGet(textBuffer)
+            icon := Icons.Decode(rawText)
+            if item.HasOwnProp('keyPicker') && icon.name = ''
+                icon := {name: 'keyboard', label: rawText, trailing: false}
+            if item.nav && InStr(rawText, 'Репорты')
+                icon := {name: 'reports', label: 'Репорты', trailing: false}
+            if icon.name != '' {
+                size := Round((w < 38 ? 15 : 18) * A_ScreenDPI / 96)
+                gap := Round(9 * A_ScreenDPI / 96)
+                measured := Buffer(8, 0)
+                DllCall('GetTextExtentPoint32W', 'ptr', dc, 'str', icon.label, 'int', StrLen(icon.label), 'ptr', measured)
+                total := size + (icon.label = '' ? 0 : gap + NumGet(measured, 0, 'int'))
+                start := item.nav || icon.trailing ? Round(14 * A_ScreenDPI / 96) : Max(8, (w - total) / 2)
+                Icons.Draw(dc, icon.name, start, (h - size) / 2, size, item.selected ? 'B9A5FF' : (item.color = '765DFF' ? 'FFFFFF' : 'BCBAC9'))
+                if icon.label != '' {
+                    NumPut('int', Round(start + size + gap), rect, 0)
+                    NumPut('int', w - Round((icon.trailing ? 34 : 10) * A_ScreenDPI / 96), rect, 8)
+                    DllCall('DrawTextW', 'ptr', dc, 'str', icon.label, 'int', -1, 'ptr', rect, 'uint', 0x8824)
+                }
+                if icon.trailing
+                    Icons.Draw(dc, 'chevron', w - 27 * A_ScreenDPI / 96, (h - size) / 2, size, '8C899C')
+            } else
+                DllCall('DrawTextW', 'ptr', dc, 'ptr', textBuffer, 'int', -1, 'ptr', rect, 'uint', 0x825)
         }
         DllCall('SelectObject', 'ptr', dc, 'ptr', oldBrush)
         DllCall('SelectObject', 'ptr', dc, 'ptr', oldPen)

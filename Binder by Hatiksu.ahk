@@ -21,6 +21,7 @@ SetWorkingDir A_ScriptDir
 SendMode 'Event'
 SetKeyDelay 25, 25
 
+#Include lib\Icons.ahk
 #Include lib\Theme.ahk
 #Include lib\Controls.ahk
 #Include lib\Dialogs.ahk
@@ -30,7 +31,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.5.2'
+        this.version := '0.6.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -48,6 +49,9 @@ class Binder extends BinderView {
         this.Load()
         this.Build()
         this.Activate()
+        if FileExist(A_ScriptDir '\assets\Binder.ico')
+            TraySetIcon A_ScriptDir '\assets\Binder.ico'
+        A_IconTip := 'Binder by Hatiksu'
         A_TrayMenu.Delete()
         A_TrayMenu.Add 'Открыть Binder by Hatiksu', (*) => this.window.Show()
         A_TrayMenu.Add 'Завершить работу', (*) => ExitApp()
