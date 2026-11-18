@@ -475,5 +475,5 @@ RunChecks() {
 }
 if A_Args.Length && A_Args[1] = '--check'
     RunChecks()
-app := Binder()
+rootBinder := Binder()
 
