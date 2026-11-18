@@ -25,14 +25,13 @@ class BinderView extends BinderFeatures {
             this.nav[name] := button
             this.pages[name] := []
         }
-        g.AddText('x24 y704 w200 h22 c77777F Center BackgroundTrans', 'Hatiksu  /  Majestic RP')
         this.pageTitle := g.AddText('x272 y25 w740 h30 BackgroundTrans', 'Основное')
         this.pageTitle.SetFont('s17 w700')
         this.pageTitle.OnEvent('Click', (*) => PostMessage(0xA1, 2, 0, , g))
         this.pageSubtitle := g.AddText('x272 y61 w760 h22 cA9A9B1 BackgroundTrans', '')
         Theme.Button(g, 'x1090 y22 w27 h26 -Tabstop', '−', '19191B').OnEvent('Click', (*) => g.Minimize())
         Theme.Button(g, 'x1128 y22 w27 h26 -Tabstop', '×', '19191B').OnEvent('Click', (*) => g.Hide())
-        this.statusText := g.AddText('x276 y724 w870 h20 c777780 BackgroundTrans', 'Majestic RP  •  AutoHotkey v2')
+        this.statusText := g.AddText('x276 y724 w870 h20 c777780 BackgroundTrans Hidden', '')
         this.Card('Основное', 272, 90, 884, 623)
         this.BuildHome()
         this.BuildTriggers()

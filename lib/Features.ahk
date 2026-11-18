@@ -205,11 +205,13 @@ class BinderFeatures {
 
     Notify(message) {
         this.statusText.Text := message
+        this.statusText.Visible := true
         SetTimer this.ClearNotice.Bind(this), -4500
     }
 
     ClearNotice() {
-        this.statusText.Text := 'Majestic RP  •  AutoHotkey v2'
+        this.statusText.Text := ''
+        this.statusText.Visible := false
     }
 
     ToggleReportOverlay(*) {
