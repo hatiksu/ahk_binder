@@ -35,15 +35,15 @@ class ReportCounter {
     }
     Poll() {
         app := this.app
-        if !RegExMatch(app.process, 'i)^[\p{L}\p{N}_. -]+\.exe$') {
-            app.autoReportStatus.Text := 'Автоподсчёт: проверь имя процесса игры в настройках'
-            return
+        app.UpdateGameStatus()
+        hwnd := app.gameWindow.hwnd
+        if this.game != hwnd {
+            IniWrite hwnd, this.path, 'Target', 'Hwnd'
+            IniWrite app.gameWindow.pid, this.path, 'Target', 'PID'
+            this.game := hwnd
         }
-        if this.game != app.process {
-            if this.HasOwnProp('pid') && ProcessExist(this.pid)
-                ProcessClose this.pid
-            this.game := app.process
-            Run '"' A_AhkPath '" /ErrorStdOut "' A_ScriptDir '\lib\ReportWorker.ahk" ' DllCall('GetCurrentProcessId', 'uint') ' "' this.game '" "' this.path '"', , 'Hide', &pid
+        if !this.HasOwnProp('pid') {
+            Run '"' A_AhkPath '" /ErrorStdOut "' A_ScriptDir '\lib\ReportWorker.ahk" ' DllCall('GetCurrentProcessId', 'uint') ' 0 "' this.path '"', , 'Hide', &pid
             this.pid := pid
         }
         if !FileExist(this.path)

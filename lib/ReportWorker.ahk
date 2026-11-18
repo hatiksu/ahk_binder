@@ -20,7 +20,8 @@ if A_Args.Length && A_Args[1] = '--file' {
 parent := Integer(A_Args[1]), game := A_Args[2], output := A_Args[3]
 detector := ReportDetector()
 CoordMode 'Mouse', 'Screen'
-HotIf (*) => WinActive('ahk_exe ' game)
+targetHwnd := 0, targetPID := 0, lastTarget := 0
+HotIf (*) => targetHwnd && WinActive('ahk_id ' targetHwnd)
 Hotkey '~LButton', RecordClick
 HotIf
 RecordClick(*) {
@@ -29,13 +30,29 @@ RecordClick(*) {
 }
 OCR.LoadLanguage('ru-RU')
 while ProcessExist(parent) {
-    hwnd := WinActive('ahk_exe ' game)
+    targetHwnd := Integer(IniRead(output, 'Target', 'Hwnd', '0'))
+    targetPID := Integer(IniRead(output, 'Target', 'PID', '0'))
+    if targetHwnd != lastTarget {
+        detector.Reset()
+        lastTarget := targetHwnd
+    }
+    hwnd := targetHwnd ? WinActive('ahk_id ' targetHwnd) : 0
+    try {
+        if hwnd && WinGetPID(hwnd) != targetPID
+            hwnd := 0
+    } catch TargetError
+        hwnd := 0
     if !hwnd || WinGetMinMax(hwnd) = -1 {
         detector.Reset()
         Sleep 700
         continue
     }
-    WinGetClientPos &x, &y, &w, &h, hwnd
+    try WinGetClientPos &x, &y, &w, &h, hwnd
+    catch TargetError {
+        detector.Reset()
+        Sleep 300
+        continue
+    }
     started := A_TickCount
     ; Область правой панели с заголовком, кнопкой и подтверждением закрытия.
     result := OCR.FromRect(x + Round(w * .58), y + Round(h * .07), Round(w * .42), Round(h * .20), {lang: 'ru-RU', scale: 1.5, monochrome: 180, invertcolors: true})

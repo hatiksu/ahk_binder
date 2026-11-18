@@ -29,22 +29,26 @@ SetKeyDelay 25, 25
 #Include lib\ReportCounter.ahk
 #Include lib\ReportDetector.ahk
 #Include lib\ReportOverlay.ahk
+#Include lib\GameWindow.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.8.2'
+        this.version := '0.9.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
             this.gender := 'male'
-        this.process := IniRead(this.ini, 'General', 'Process', 'GTA5.exe')
+        this.gameWindow := GameWindow(this.ini)
+        this.gameWindow.Refresh()
+        this.chatKey := IniRead(this.ini, 'Input', 'ChatKey', 't')
+        this.chatDelay := Max(50, Min(2000, Integer(IniRead(this.ini, 'Input', 'ChatDelay', '180'))))
         this.registered := []
         this.bound := []
         this.rows := []
         this.binds := []
-        this.context := (*) => WinActive('ahk_exe ' this.process)
+        this.context := (*) => this.gameWindow.Active()
         this.testChatHwnd := 0
         this.testInputHwnd := 0
         this.triggerContext := this.TriggerAllowed.Bind(this)
@@ -307,16 +311,19 @@ class Binder extends BinderView {
     }
 
     SaveSettings() {
-        if !RegExMatch(Trim(this.exe.Value), 'i)^[\w. -]+\.exe$') {
-            DarkDialog.Message 'Укажи имя процесса, например GTA5.exe.'
+        key := this.chatKeyField.Value
+        if key = '' || !GetKeyVK(key) {
+            this.Notify('Выбери одну клавишу открытия чата.')
             return
         }
-        if this.factionId.Value != '' && !RegExMatch(this.factionId.Value, '^\d+$') {
-            this.Notify('ID фракции должен быть числом или пустым полем.')
+        if !RegExMatch(this.chatDelayField.Value, '^\d{2,4}$') || Integer(this.chatDelayField.Value) < 50 || Integer(this.chatDelayField.Value) > 2000 {
+            this.Notify('Задержка должна быть от 50 до 2000 мс.')
             return
         }
-        this.process := Trim(this.exe.Value)
-        IniWrite this.process, this.ini, 'General', 'Process'
+        this.chatKey := key
+        this.chatDelay := Integer(this.chatDelayField.Value)
+        IniWrite this.chatKey, this.ini, 'Input', 'ChatKey'
+        IniWrite this.chatDelay, this.ini, 'Input', 'ChatDelay'
         for name, field in this.variables
             IniWrite field.Value, this.ini, 'Variables', name
         this.Refresh()
@@ -402,10 +409,10 @@ class Binder extends BinderView {
         if openChat {
             for modifier in ['Ctrl', 'Alt', 'Shift', 'LWin', 'RWin']
                 KeyWait modifier
-            if !this.context()
+            if !this.context() || WinExist('A') != target
                 return
-            SendEvent 't'
-            Sleep 180
+            SendEvent '{' this.chatKey '}'
+            Sleep this.chatDelay
         }
         for action in actions {
             if WinExist('A') != target
@@ -704,9 +711,27 @@ RunChecks() {
     if app.customOverlays[1].enabled
         throw Error('Не работает переключение оверлея')
     app.ShowPage('Настройки')
-    app.exe.Value := 'GTA5_Enhanced.exe'
+    if !GameWindow.Matches('Grand Theft Auto V', 'grcWindow') || GameWindow.Matches('Grand Theft Auto V', 'Chrome_WidgetWin_1') || GameWindow.Matches('Majestic Launcher', 'grcWindow')
+        throw Error('Автоопределение выбирает неподходящее окно')
+    probe := Gui(, 'Тест привязки окна')
+    probe.AddText(, 'Тест')
+    target := GameWindow(app.ini)
+    target.Use(probe.Hwnd)
+    if target.hwnd != probe.Hwnd || target.mode != 'manual' || target.Active()
+        throw Error('Неверная привязка скрытого окна')
+    restoredTarget := GameWindow(app.ini)
+    if restoredTarget.mode != 'manual' || restoredTarget.title != 'Тест привязки окна'
+        throw Error('Выбранное окно не сохранилось')
+    probe.Destroy()
+    if target.Refresh() || target.Active()
+        throw Error('Закрытое окно осталось целью биндов')
+    target.Use()
+    if target.mode != 'auto'
+        throw Error('Не включается автоматический поиск окна')
+    app.chatKeyField.Value := 'F6'
+    app.chatDelayField.Value := '250'
     CheckClickText(app, 'Настройки', 'Сохранить настройки')
-    if IniRead(app.ini, 'General', 'Process') != 'GTA5_Enhanced.exe'
+    if IniRead(app.ini, 'Input', 'ChatKey') != 'F6' || IniRead(app.ini, 'Input', 'ChatDelay') != '250'
         throw Error('Не работает сохранение настроек')
     app.CreateOverlay(0, 'Проверка счётчика', '', 40, 60)
     CheckClick(app.moveButton)

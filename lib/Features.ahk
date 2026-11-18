@@ -104,8 +104,6 @@ class BinderFeatures {
         for label, button in this.factionButtons
             Theme.Select(button, label != 'Все' && label = name)
         this.factionButtons['Все'].Text := 'Все'
-        this.factionId.Value := this.GetFactionID(name)
-        this.factionLabel.Text := 'Для выбранной фракции: ' name
     }
 
     IsExtraFaction(name) {
@@ -117,6 +115,48 @@ class BinderFeatures {
         selected := DarkDialog.Choice('Остальные фракции', ['GOV', 'EMS', 'WN', 'BALLAS', 'VAGOS', 'FAM', 'BLOODS', 'MARA'], current)
         if selected != ''
             this.SetFaction(selected)
+    }
+
+    ChooseGameWindow(*) {
+        choices := [], handles := []
+        for hwnd in WinGetList() {
+            try {
+                title := WinGetTitle(hwnd)
+                if title = '' || WinGetPID(hwnd) = DllCall('GetCurrentProcessId', 'uint') || (WinGetExStyle(hwnd) & 0x80)
+                    continue
+                choices.Push(title ' (' (choices.Length + 1) ')')
+                handles.Push(hwnd)
+            }
+        }
+        selected := DarkDialog.Choice('Выбери окно игры', choices)
+        if selected = ''
+            return
+        for index, label in choices {
+            if label = selected {
+                if !DllCall('IsWindow', 'ptr', handles[index]) {
+                    this.Notify('Окно уже закрыто. Открой список заново.')
+                    return
+                }
+                this.gameWindow.Use(handles[index])
+                break
+            }
+        }
+        this.UpdateGameStatus()
+    }
+
+    AutoGameWindow(*) {
+        this.gameWindow.Use()
+        this.UpdateGameStatus()
+    }
+
+    UpdateGameStatus() {
+        hwnd := this.gameWindow.Refresh()
+        try text := hwnd ? 'Окно игры: ' WinGetTitle(hwnd) : 'Ожидаю окно игры'
+        catch TargetError
+            text := 'Ожидаю окно игры'
+        text .= this.gameWindow.mode = 'auto' ? ' (автоматически)' : ' (выбрано вручную)'
+        if this.gameStatus.Text != text
+            this.gameStatus.Text := text
     }
 
     SetESP(number, *) {
