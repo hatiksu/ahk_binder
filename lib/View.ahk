@@ -152,7 +152,7 @@ class BinderView extends BinderFeatures {
         this.triggerStat := values[1], this.todayStat := values[2], this.weekStat := values[3]
         this.Label(page, 298, 219, 700, 'Быстрые действия', 13, , 700)
         this.Button(page, 298, 254, 170, '▤  Change Log', (*) => this.ShowPage('Change Log'))
-        this.Button(page, 480, 254, 170, '↻  Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder/commits/main'))
+        this.Button(page, 480, 254, 170, '↻  Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder/releases'))
         this.Button(page, 662, 254, 170, '◉  Discord', (*) => Run('https://discord.gg/KtrHWbjwFY'), true)
         this.Button(page, 844, 254, 170, 'ⓘ  Пройти гайд', this.Guide.Bind(this))
         this.Label(page, 298, 322, 700, '⌁  Рабочее пространство', 13, , 700)
