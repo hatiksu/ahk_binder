@@ -30,7 +30,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.5.1'
+        this.version := '0.5.2'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -228,7 +228,7 @@ class Binder extends BinderView {
     }
 
     Export() {
-        path := DarkDialog.File('S16', 'hatiksu_' this.gender '.txt', 'Экспорт конфига', 'Текст (*.txt)')
+        path := FileSelect('S16', 'hatiksu_' this.gender '.txt', 'Экспорт конфига', 'Текст (*.txt)')
         if path {
             if !RegExMatch(path, 'i)\.txt$')
                 path .= '.txt'
