@@ -22,7 +22,9 @@ class BinderFeatures {
         this.overlayIni := this.dir '\overlays.ini'
         this.overlayEnabled := IniRead(this.ini, 'Overlay', 'Enabled', '0') = '1'
         this.overlayStyle := IniRead(this.ini, 'Overlay', 'Style', 'compact')
-        this.norm := Max(1, Integer(IniRead(this.ini, 'Reports', 'Norm', '20')))
+        legacyNorm := IniRead(this.ini, 'Reports', 'Norm', '20')
+        this.normWeekday := Max(1, Integer(IniRead(this.ini, 'Reports', 'WeekdayNorm', legacyNorm)))
+        this.normWeekend := Max(1, Integer(IniRead(this.ini, 'Reports', 'WeekendNorm', legacyNorm)))
         this.customOverlays := []
         count := Integer(IniRead(this.overlayIni, 'General', 'Count', '0'))
         loop Min(count, 100) {
@@ -37,36 +39,28 @@ class BinderFeatures {
     }
 
     ProfileMenu(*) {
-        this.CreateProfileMenu().Show()
-    }
-
-    CreateProfileMenu() {
-        profileMenu := Menu()
-        profileMenu.Add 'Основной', (*) => this.SwitchProfile('Основной')
-        if this.profile = 'Основной'
-            profileMenu.Check 'Основной'
+        choices := ['Основной']
         if DirExist(this.rootDir '\profiles') {
             loop files this.rootDir '\profiles\*', 'D' {
-                name := A_LoopFileName
-                if !RegExMatch(name, '^[\p{L}\p{N}_ -]{1,32}$')
-                    continue
-                profileMenu.Add name, this.SwitchProfile.Bind(this, name)
-                if name = this.profile
-                    profileMenu.Check name
+                if RegExMatch(A_LoopFileName, '^[\p{L}\p{N}_ -]{1,32}$')
+                    choices.Push(A_LoopFileName)
             }
         }
-        profileMenu.Add
-        profileMenu.Add '+ Новый профиль', (*) => this.NewProfile()
-        return profileMenu
+        choices.Push('+ Новый профиль')
+        selected := DarkDialog.Choice('Профили', choices, this.profile)
+        if selected = '+ Новый профиль'
+            this.NewProfile()
+        else if selected != ''
+            this.SwitchProfile(selected)
     }
 
     NewProfile() {
-        result := InputBox('Название профиля: до 32 букв, цифр, пробелов или дефисов.', 'Новый профиль', 'w430 h140')
+        result := DarkDialog.Prompt('Название профиля: до 32 букв, цифр, пробелов или дефисов.', 'Новый профиль', 'w430 h140')
         if result.Result != 'OK'
             return
         name := Trim(result.Value)
         if !RegExMatch(name, '^[\p{L}\p{N}_ -]{1,32}$') {
-            MsgBox 'В названии допустимы буквы, цифры, пробелы, _ и -.'
+            DarkDialog.Message 'В названии допустимы буквы, цифры, пробелы, _ и -.'
             return
         }
         this.SwitchProfile(name)
@@ -134,19 +128,34 @@ class BinderFeatures {
     }
 
     SaveNorm(*) {
-        if !RegExMatch(this.normField.Value, '^\d{1,5}$') || Integer(this.normField.Value) < 1 {
-            this.Notify('Норма должна быть числом от 1 до 99999.')
-            return
+        for field in [this.weekdayNormField, this.weekendNormField] {
+            if !RegExMatch(field.Value, '^\d{1,5}$') || Integer(field.Value) < 1 {
+                DarkDialog.Message('Укажи обе нормы: целые числа от 1 до 99999.', 'Норма репортов')
+                return
+            }
         }
-        this.norm := Integer(this.normField.Value)
-        IniWrite this.norm, this.ini, 'Reports', 'Norm'
+        this.normWeekday := Integer(this.weekdayNormField.Value)
+        this.normWeekend := Integer(this.weekendNormField.Value)
+        IniWrite this.normWeekday, this.ini, 'Reports', 'WeekdayNorm'
+        IniWrite this.normWeekend, this.ini, 'Reports', 'WeekendNorm'
         this.UpdateStats()
         this.RenderOverlays()
-        this.Notify('Дневная норма сохранена')
+        this.Notify('Нормы для будней и выходных сохранены')
+    }
+
+    NormForDay(date := '') {
+        if date = ''
+            date := A_Now
+        day := Integer(FormatTime(date, 'WDay'))
+        return day = 1 || day = 7 ? this.normWeekend : this.normWeekday
+    }
+
+    norm {
+        get => this.NormForDay()
     }
 
     ResetReports(*) {
-        if MsgBox('Обнулить счётчик за сегодня? История других дней сохранится.', 'Репорты', 'YesNo') = 'Yes' {
+        if DarkDialog.Message('Обнулить счётчик за сегодня? История других дней сохранится.', 'Репорты', 'YesNo') = 'Yes' {
             IniWrite 0, this.reportIni, 'Daily', FormatTime(, 'yyyyMMdd')
             this.UpdateStats()
             this.RenderOverlays()
@@ -161,7 +170,8 @@ class BinderFeatures {
         this.reportToday.Text := stats.day ' / ' this.norm
         this.reportWeek.Text := stats.week
         this.reportProgress.Value := Min(100, Round(stats.day / this.norm * 100))
-        this.reportHint.Text := 'Выполнено ' Round(stats.day / this.norm * 100) '% дневной нормы'
+        weekend := FormatTime(, 'WDay') = '1' || FormatTime(, 'WDay') = '7'
+        this.reportHint.Text := 'Выполнено ' Round(stats.day / this.norm * 100) '%  ·  ' (weekend ? 'Норма выходного дня' : 'Норма буднего дня') ': ' this.norm
         loop 14 {
             date := DateAdd(A_Now, -(A_Index - 1), 'Days')
             key := FormatTime(date, 'yyyyMMdd')
@@ -227,7 +237,7 @@ class BinderFeatures {
     }
 
     CreateOverlay(index, text, image, x, y) {
-        g := Gui('+AlwaysOnTop -Caption +ToolWindow +E0x08000000', 'Hatiksu • оверлей')
+        g := Gui('+AlwaysOnTop -Caption +ToolWindow +E0x08000000', 'Binder by Hatiksu • оверлей')
         Theme.Window(g)
         g.MarginX := 16, g.MarginY := 12
         g.SetFont('s11 w600 cD8D0FF')
@@ -332,7 +342,7 @@ class BinderFeatures {
         if !fresh && !index
             return
         item := fresh ? {name: '', text: '', image: '', key: '', enabled: true, x: 60, y: 180} : this.customOverlays[index]
-        d := Gui('+Owner' this.window.Hwnd, 'Кастомный оверлей')
+        d := DarkDialog.Window('Кастомный оверлей', 650)
         Theme.Window(d)
         d.MarginX := 24, d.MarginY := 20
         d.AddText('w600', 'Название')
@@ -349,28 +359,28 @@ class BinderFeatures {
         this.overlayEditor := {gui: d, title: title, body: body, image: picture, key: key, save: saveButton}
         d.Show(A_Args.Length && A_Args[1] = '--check' ? 'Hide' : '')
         Browse(*) {
-            selectedImage := FileSelect(1, , 'Изображение оверлея', 'Изображения (*.png; *.jpg; *.jpeg; *.bmp; *.gif)')
+            selectedImage := DarkDialog.File(1, , 'Изображение оверлея', 'Изображения (*.png; *.jpg; *.jpeg; *.bmp; *.gif)')
             if selectedImage
                 picture.Value := selectedImage
         }
         Commit(*) {
             if Trim(title.Value) = '' || (Trim(body.Value) = '' && picture.Value = '') {
-                MsgBox 'Укажи название и текст или изображение.'
+                DarkDialog.Message 'Укажи название и текст или изображение.'
                 return
             }
             if picture.Value != '' && !FileExist(picture.Value) {
-                MsgBox 'Изображение не найдено.'
+                DarkDialog.Message 'Изображение не найдено.'
                 return
             }
             for binding in this.binds {
                 if key.Value != '' && key.Value = binding.key {
-                    MsgBox 'Сочетание занято биндом.'
+                    DarkDialog.Message 'Сочетание занято биндом.'
                     return
                 }
             }
             for n, overlay in this.customOverlays {
                 if key.Value != '' && key.Value = overlay.key && (fresh || n != index) {
-                    MsgBox 'Сочетание занято другим оверлеем.'
+                    DarkDialog.Message 'Сочетание занято другим оверлеем.'
                     return
                 }
             }
@@ -390,7 +400,7 @@ class BinderFeatures {
 
     DeleteOverlay(*) {
         index := this.customList.GetNext()
-        if index && MsgBox('Удалить выбранный оверлей?', 'Оверлей', 'YesNo') = 'Yes' {
+        if index && DarkDialog.Message('Удалить выбранный оверлей?', 'Оверлей', 'YesNo') = 'Yes' {
             this.customOverlays.RemoveAt(index)
             this.SaveCustomOverlays()
             this.RefreshOverlayList()
@@ -400,7 +410,7 @@ class BinderFeatures {
 
     Guide(*) {
         text := '1. Выбери или создай профиль слева сверху.`n`n2. На главной выбери пол, фракцию и тип /esp. Discord-поля сохраняются сразу.`n`n3. В «Триггерах» доступен поиск, категории, импорт и экспорт. В открытом чате введи сокращение, затем пробел.`n`n4. В «Биндах клавиш» нажми поле клавиш и введи сочетание. Esc отменяет запись, Backspace очищает поле. Бинд открывает чат клавишей T.`n`n5. В «Оверлеях» включи счётчик и создай свои плашки. Кнопка «Переместить» позволяет перетаскивать их; «Готово» сохраняет положение.`n`n6. {rep} в конце успешно отправленного шаблона увеличивает локальный счётчик репортов. Счётчик не читает данные сервера; его можно поправить вручную.`n`nБиндер работает, пока запущен скрипт. Оверлеи работают поверх оконного режима игры и режима без рамки.'
-        d := Gui('+Owner' this.window.Hwnd, 'Как пользоваться Hatiksu Binder')
+        d := DarkDialog.Window('Как пользоваться Binder by Hatiksu', 720)
         Theme.Window(d)
         d.MarginX := 24, d.MarginY := 24
         d.AddText('w670', text)

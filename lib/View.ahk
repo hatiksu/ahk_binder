@@ -1,13 +1,13 @@
 class BinderView extends BinderFeatures {
     Build() {
-        g := Gui('-Caption +Border', 'Hatiksu Binder')
+        g := Gui('-Caption +Border', 'Binder by Hatiksu')
         this.window := g
         Theme.Window(g)
         sidebar := g.AddText('x0 y0 w246 h746 Background1B1B1D +0x4000000', '')
         g.AddText('x245 y0 w1 h746 Background333335', '')
         logo := Theme.Button(g, 'x24 y22 w30 h30 -Tabstop', 'H', '765DFF')
-        brand := g.AddText('x65 y22 w175 h34 BackgroundTrans', 'Hatiksu Binder')
-        brand.SetFont('s16 w700 italic')
+        brand := g.AddText('x65 y22 w175 h34 BackgroundTrans', 'Binder by Hatiksu')
+        brand.SetFont('s15 w700 italic')
         brand.OnEvent('Click', (*) => PostMessage(0xA1, 2, 0, , g))
         this.profileButton := Theme.Button(g, 'x18 y80 w210 h44', '●  ' this.profile '      ⌄', '18181A')
         this.profileButton.OnEvent('Click', this.ProfileMenu.Bind(this))
@@ -88,6 +88,8 @@ class BinderView extends BinderFeatures {
             else if type = 'Text'
                 options .= ' BackgroundTrans'
             c := this.window.Add(type, options, value)
+            if type = 'Edit'
+                Theme.SingleLine(c)
             if type = 'Edit' || type = 'ListView' || type = 'DropDownList'
                 Theme.Dark(c)
         }
@@ -143,7 +145,7 @@ class BinderView extends BinderFeatures {
             this.Card(page, x, 115, 196, 78, '222224')
             caption := this.Label(page, x + 16, 129, 170, title, 9, 'C9C9D0', 600)
             caption.Opt('Background222224')
-            value := this.Label(page, x + 16, 153, 165, i = 4 ? '0.3.0' : '0', 16, i = 2 ? 'ED6969' : 'FFFFFF', 700, 30)
+            value := this.Label(page, x + 16, 153, 165, i = 4 ? '0.4.0' : '0', 16, i = 2 ? 'ED6969' : 'FFFFFF', 700, 30)
             value.Opt('Background222224')
             values.Push(value)
         }
@@ -151,7 +153,7 @@ class BinderView extends BinderFeatures {
         this.Label(page, 298, 219, 700, 'Быстрые действия', 13, , 700)
         this.Button(page, 298, 254, 170, '▤  Change Log', (*) => this.ShowPage('Change Log'))
         this.Button(page, 480, 254, 170, '↻  Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder/commits/main'))
-        this.Button(page, 662, 254, 170, '◉  Discord', (*) => Run('https://discord.gg/DYUWSWgUnJ'), true)
+        this.Button(page, 662, 254, 170, '◉  Discord', (*) => Run('https://discord.gg/KtrHWbjwFY'), true)
         this.Button(page, 844, 254, 170, 'ⓘ  Пройти гайд', this.Guide.Bind(this))
         this.Label(page, 298, 322, 700, '⌁  Рабочее пространство', 13, , 700)
         this.Button(page, 298, 357, 238, '▣  Открыть конфиги профиля', (*) => Run(this.dir))
@@ -307,12 +309,14 @@ class BinderView extends BinderFeatures {
         this.reportWeek.Opt('Background222224')
         this.reportProgress := this.Add(page, 'Progress', 'x298 y299 w832 h8 c8870FF Background303034', 0)
         this.reportHint := this.Label(page, 298, 320, 810, '', 9, 'A9A9B3')
-        this.Button(page, 298, 373, 180, '+ Принят репорт', this.ChangeReports.Bind(this, 1), true, 36)
-        this.Button(page, 490, 373, 120, '− Убрать 1', this.ChangeReports.Bind(this, -1), false, 36)
-        this.Button(page, 622, 373, 150, 'Обнулить день', this.ResetReports.Bind(this), false, 36)
-        this.Label(page, 816, 346, 300, 'Дневная норма', 9, 'B8B8C0')
-        this.normField := this.Add(page, 'Edit', 'x816 y373 w110 h36 Number', this.norm)
-        this.Button(page, 940, 373, 190, 'Сохранить норму', this.SaveNorm.Bind(this), false, 36)
+        this.Button(page, 298, 373, 154, '+ Принят репорт', this.ChangeReports.Bind(this, 1), true, 36)
+        this.Button(page, 464, 373, 98, '− Убрать 1', this.ChangeReports.Bind(this, -1), false, 36)
+        this.Button(page, 574, 373, 138, 'Обнулить день', this.ResetReports.Bind(this), false, 36)
+        this.Label(page, 736, 346, 116, 'Норма в будни', 9, 'B8B8C0')
+        this.weekdayNormField := this.Add(page, 'Edit', 'x736 y373 w112 h36', this.normWeekday)
+        this.Label(page, 864, 346, 132, 'Норма в выходные', 9, 'B8B8C0')
+        this.weekendNormField := this.Add(page, 'Edit', 'x864 y373 w112 h36', this.normWeekend)
+        this.Button(page, 992, 373, 138, 'Сохранить', this.SaveNorm.Bind(this), false, 36)
         this.Label(page, 298, 438, 800, 'История за последние 14 дней', 11, , 600)
         this.historyTiles := []
         loop 14 {
@@ -340,7 +344,7 @@ class BinderView extends BinderFeatures {
         subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
             'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
             'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
-            'Change Log', 'История обновлений Hatiksu Binder')
+            'Change Log', 'История обновлений Binder by Hatiksu')
         this.pageTitle.Text := name
         this.pageSubtitle.Text := subtitles[name]
         this.EmptyStates()
@@ -395,9 +399,9 @@ class BinderView extends BinderFeatures {
         page := 'Change Log'
         this.Card(page, 272, 102, 884, 611)
         this.Button(page, 298, 125, 144, '← На главную', (*) => this.ShowPage('Основное'))
-        this.Label(page, 298, 196, 800, '0.3.0', 23, 'AD9BFF', 700, 40)
+        this.Label(page, 298, 196, 800, '0.4.0', 23, 'AD9BFF', 700, 40)
         this.Label(page, 298, 244, 800, '18 ноября 2026  ·  Интерфейс и удобство', 10, '9999A8')
-        this.Label(page, 298, 290, 796, '• Тёмные списки с аккуратными заголовками и свободными строками.`n• Новые пустые состояния биндов и оверлеев — без сеток и полос.`n• Назначение клавиш в стиле приложения и понятные названия сочетаний.`n• Отдельная страница Change Log и кнопка Discord на главной.`n• Удалены пауза и переключатель: биндер работает вместе со скриптом.', 11, 'D0D0DA', , 150)
+        this.Label(page, 298, 290, 796, '• Название приложения — Binder by Hatiksu.`n• Все диалоги, редакторы и выбор файлов в общей тёмной теме.`n• Раздельные нормы репортов для будней и выходных.`n• Нужная норма автоматически выбирается в счётчике и оверлее.`n• Обновлена ссылка Discord, убраны стрелки прокрутки в полях.', 11, 'D0D0DA', , 150)
         this.Label(page, 298, 478, 800, '0.2.0', 18, 'EEEEF2', 700, 32)
         this.Label(page, 298, 523, 796, 'Профили, мужской и женский наборы, выбор фракции и /esp.`nСчётчик репортов, дневная норма, история и кастомные оверлеи.`nИмпорт, экспорт и категории триггеров.', 11, 'A9A9B7', , 100)
     }

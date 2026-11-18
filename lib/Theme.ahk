@@ -142,6 +142,14 @@ class Theme {
         DllCall('uxtheme\SetWindowTheme', 'ptr', c.Hwnd, 'str', 'DarkMode_Explorer', 'ptr', 0)
     }
 
+    static SingleLine(c) {
+        style := DllCall('GetWindowLongPtr', 'ptr', c.Hwnd, 'int', -16, 'ptr')
+        DllCall('SetWindowLongPtr', 'ptr', c.Hwnd, 'int', -16, 'ptr', style & ~0x200004, 'ptr')
+        DllCall('ShowScrollBar', 'ptr', c.Hwnd, 'int', 1, 'int', false)
+        DllCall('SetWindowPos', 'ptr', c.Hwnd, 'ptr', 0, 'int', 0, 'int', 0, 'int', 0, 'int', 0, 'uint', 0x37)
+        this.Dark(c)
+    }
+
     static Window(g) {
         g.BackColor := '1D1D1F'
         g.SetFont('s10 cEAEAEF', 'Segoe UI')

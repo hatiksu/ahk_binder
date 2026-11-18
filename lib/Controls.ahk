@@ -99,15 +99,12 @@ class CategoryPicker {
         this.changed.Call()
     }
     Open() {
-        popup := Menu()
+        selected := DarkDialog.Choice('Категории триггеров', this.choices, this.Text)
         for index, label in this.choices {
-            title := StrReplace(label, '&', '&&')
-            popup.Add title, this.Select.Bind(this, index)
-            if index = this.index
-                popup.Check title
+            if label = selected {
+                this.Select(index)
+                return
+            }
         }
-        rect := Buffer(16)
-        DllCall('GetWindowRect', 'ptr', this.control.Hwnd, 'ptr', rect)
-        popup.Show(NumGet(rect, 0, 'int'), NumGet(rect, 12, 'int'))
     }
 }
