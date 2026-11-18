@@ -41,6 +41,8 @@ class DarkDialog {
         frame.close.OnEvent('Click', (*) => frame.gui.Destroy())
         frame.gui.OnEvent('Close', (*) => frame.gui.Destroy())
         frame.gui.OnEvent('Escape', (*) => frame.gui.Destroy())
+        ; Явная точка начала содержимого, чтобы оно не наследовало X кнопки закрытия.
+        frame.gui.AddText('x24 y56 w1 h1 Hidden', '')
         return frame.gui
     }
 

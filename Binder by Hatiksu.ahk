@@ -24,11 +24,14 @@ SetKeyDelay 25, 25
 #Include lib\Theme.ahk
 #Include lib\Controls.ahk
 #Include lib\Dialogs.ahk
+#Include lib\ScrollPage.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
+        this.version := '0.5.0'
+        this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
             this.gender := 'male'
@@ -83,6 +86,7 @@ class Binder extends BinderView {
 
     Load() {
         this.config := this.Parse(FileRead(this.dir '\' this.gender '.txt', 'UTF-8'))
+        this.configRevision := this.HasOwnProp('configRevision') ? this.configRevision + 1 : 1
         if this.HasOwnProp('category')
             this.UpdateCategories()
         this.binds := []
@@ -131,7 +135,7 @@ class Binder extends BinderView {
         d := DarkDialog.Window(title, 700)
         Theme.Window(d)
         d.MarginX := 24, d.MarginY := 24
-        d.AddText('w650', isBind ? 'Нажми сочетание клавиш' : 'Триггер (например /ltk или .ключ)')
+        d.AddText('x24 y78 w650', isBind ? 'Нажми сочетание клавиш' : 'Триггер (например /ltk или .ключ)')
         if isBind
             k := KeyPicker(d, 'w650 h40', key)
         else {
@@ -237,7 +241,7 @@ class Binder extends BinderView {
         report := this.config.problems.Length ? this.Join(this.config.problems) : 'Ошибок формата и повторов нет.'
         d := DarkDialog.Window('Диагностика конфига', 830)
         Theme.Window(d)
-        d.AddEdit('w780 r22 ReadOnly Background252527 cEEEEF2', report)
+        d.AddEdit('x24 y78 w780 r22 ReadOnly Background252527 cEEEEF2', report)
         d.Show()
     }
 
@@ -385,6 +389,17 @@ RunChecks() {
     app := Binder()
     if app.normWeekday != 37 || app.normWeekend != 37
         throw Error('Не перенесена старая дневная норма')
+    for required in ['0.1.0', '0.2.0', '0.3.0', '0.4.0', '0.5.0'] {
+        found := false
+        for entry in app.history {
+            if entry.version = required
+                found := true
+        }
+        if !found
+            throw Error('Из истории пропала версия ' required)
+    }
+    if app.historyScroll.cards.Length != app.history.Length
+        throw Error('Не все версии отображаются в истории')
     FileAppend 'OK: ' app.config.entries.Length ' triggers; ' app.registered.Length ' registered; ' app.config.problems.Length ' diagnostics`n', '*'
     if app.registered.Length != app.config.entries.Length
         throw Error('Not all triggers registered')
@@ -425,6 +440,29 @@ RunChecks() {
     if app.currentPage != 'Change Log'
         throw Error('Не работает страница Change Log')
     CheckClickText(app, 'Change Log', '← На главную')
+    app.Guide()
+    if app.currentPage != 'Гайд' || app.guideScroll.cards.Length != 7
+        throw Error('Не работает страница гайда')
+    CheckClickText(app, 'Гайд', '← На главную')
+    app.ShowPage('Change Log')
+    scroll := app.historyScroll
+    if scroll.total <= scroll.height
+        throw Error('История не содержит ожидаемого объёма текста')
+    SendMessage 0x20A, (65536 - 120) << 16, 0, scroll.viewport.Hwnd
+    Sleep 40
+    if scroll.offset <= 0
+        throw Error('Не работает колесо мыши в истории')
+    SendMessage 0x115, 7, 0, scroll.viewport.Hwnd
+    Sleep 40
+    if scroll.offset != scroll.total - scroll.height
+        throw Error('Не работает прокрутка к последней версии')
+    scrollInfo := Buffer(28, 0)
+    NumPut('uint', 28, 'uint', 4, scrollInfo)
+    DllCall('GetScrollInfo', 'ptr', scroll.viewport.Hwnd, 'int', 1, 'ptr', scrollInfo)
+    if NumGet(scrollInfo, 20, 'int') != Round(scroll.offset)
+        throw Error('Полоса прокрутки не соответствует положению страницы')
+    scroll.SetOffset(0)
+    app.ShowPage('Основное')
     for list in [app.list, app.bindList, app.customList] {
         if SendMessage(0x1037, 0, 0, list) & 1
             throw Error('В списке осталась сетка')
@@ -455,6 +493,10 @@ RunChecks() {
         throw Error('Не работает выбор /esp')
     app.ShowPage('Бинды клавиш')
     CheckClickText(app, 'Бинды клавиш', '+ Добавить бинд')
+    app.editorFields.key.control.GetPos(&editorX, &editorY)
+    app.editorFields.gui.GetPos(, , &editorWidth)
+    if editorX != 24 || editorY < 78 || editorWidth > 760 * A_ScreenDPI / 96
+        throw Error('Содержимое редактора смещено относительно заголовка')
     app.editorFields.key.Capture()
     SendMessage 0x100, 0x78, 0, app.editorFields.key.control
     if !RegExMatch(app.editorFields.key.Value, 'F9$') || app.editorFields.key.active
@@ -555,6 +597,34 @@ RunChecks() {
     selected := DarkDialog.File(1, '', 'Выбор конфига', 'Триггеры (*.txt)')
     if selected != A_ScriptDir '\configs\male.txt'
         throw Error('Не работает тёмный выбор файла')
+    app.CreateOverlay(0, app.ReportOverlayText(app.ReportCounts()), '', 40, 60)
+    overlayHandle := app.overlayWindows[1].gui.Hwnd
+    builds := app.overlayBuilds
+    paints := app.statsPaints
+    loop 20 {
+        app.DailyRefresh()
+        app.UpdateStats()
+    }
+    if app.overlayBuilds != builds || app.statsPaints != paints
+        throw Error('Фоновое обновление повторно строит неизменившийся интерфейс')
+    app.ChangeReports(1)
+    if app.overlayWindows[1].gui.Hwnd != overlayHandle || app.overlayBuilds != builds
+        throw Error('Изменение счётчика пересоздало окно оверлея')
+    if !InStr(app.overlayWindows[1].textControl.Text, '1 /')
+        throw Error('Текст оверлея не обновился')
+    app.ShowPage('Триггеры')
+    app.search.Value := ''
+    app.Refresh()
+    app.list.Modify(1, 'Select Focus')
+    app.Refresh()
+    if app.list.GetNext() != 1
+        throw Error('Неизменившийся поиск повторно создаёт строки')
+    app.search.Value := '/hatiksu_test'
+    app.ScheduleSearch()
+    Sleep 220
+    if app.rows.Length != 1 || app.rows[1].key != '/hatiksu_test'
+        throw Error('Не работает отложенный поиск')
+    FileAppend 'OK: complete version history, guide layout, wheel and scrollbar, cached stats, stable overlays, debounced search`n', '*'
     FileAppend 'OK: legacy norm migration, weekday/weekend boundaries, single-line inputs, dark dialogs, confirmations, file picker`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp

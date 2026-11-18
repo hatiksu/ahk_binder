@@ -42,6 +42,8 @@ class BinderView extends BinderFeatures {
         this.BuildReports()
         this.pages['Change Log'] := []
         this.BuildChangelog()
+        this.pages['Гайд'] := []
+        this.BuildGuide()
         Theme.Restack()
         DllCall('SetWindowPos', 'ptr', sidebar.Hwnd, 'ptr', 1, 'int', 0, 'int', 0, 'int', 0, 'int', 0, 'uint', 0x13)
         g.OnEvent('Close', (*) => g.Hide())
@@ -145,7 +147,7 @@ class BinderView extends BinderFeatures {
             this.Card(page, x, 115, 196, 78, '222224')
             caption := this.Label(page, x + 16, 129, 170, title, 9, 'C9C9D0', 600)
             caption.Opt('Background222224')
-            value := this.Label(page, x + 16, 153, 165, i = 4 ? '0.4.0' : '0', 16, i = 2 ? 'ED6969' : 'FFFFFF', 700, 30)
+            value := this.Label(page, x + 16, 153, 165, i = 4 ? this.version : '0', 16, i = 2 ? 'ED6969' : 'FFFFFF', 700, 30)
             value.Opt('Background222224')
             values.Push(value)
         }
@@ -196,7 +198,8 @@ class BinderView extends BinderFeatures {
         this.Card(page, 272, 102, 884, 611)
         this.search := this.Add(page, 'Edit', 'x298 y127 w360 h32', '')
         SendMessage 0x1501, 1, StrPtr('Поиск триггера, текста или категории…'), this.search
-        this.search.OnEvent('Change', (*) => this.Refresh())
+        this.searchRefresh := this.Refresh.Bind(this)
+        this.search.OnEvent('Change', this.ScheduleSearch.Bind(this))
         categories := ['Все категории'], seen := Map()
         for item in this.config.entries {
             if !seen.Has(item.category) {
@@ -344,7 +347,7 @@ class BinderView extends BinderFeatures {
         subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
             'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
             'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
-            'Change Log', 'История обновлений Binder by Hatiksu')
+            'Change Log', 'История обновлений Binder by Hatiksu', 'Гайд', 'Как настроить и использовать Binder by Hatiksu')
         this.pageTitle.Text := name
         this.pageSubtitle.Text := subtitles[name]
         this.EmptyStates()
@@ -357,26 +360,49 @@ class BinderView extends BinderFeatures {
     }
 
     Refresh() {
-        this.list.Delete()
-        this.rows := []
+        SetTimer this.searchRefresh, 0
         needle := this.search.Value
         category := this.category.Text
-        for item in this.config.entries {
-            if category != 'Все категории' && category != item.category
-                continue
-            if needle != '' && !InStr(item.key ' ' item.text ' ' item.category, needle)
-                continue
-            this.rows.Push(item)
-            this.list.Add(, item.key, item.text, item.category)
+        signature := this.configRevision '|' needle '|' category
+        if !this.HasOwnProp('listSignature') || this.listSignature != signature {
+            visible := DllCall('GetWindowLongPtr', 'ptr', this.list.Hwnd, 'int', -16, 'ptr') & 0x10000000
+            SendMessage 0xB, 0, 0, this.list
+            try {
+                this.list.Delete()
+                this.rows := []
+                for item in this.config.entries {
+                    if category != 'Все категории' && category != item.category
+                        continue
+                    if needle != '' && !InStr(item.key ' ' item.text ' ' item.category, needle)
+                        continue
+                    this.rows.Push(item)
+                    this.list.Add(, item.key, item.text, item.category)
+                }
+                this.Columns(this.list, [140, 480, 192])
+                this.listSignature := signature
+            } finally {
+                SendMessage 0xB, 1, 0, this.list
+                this.list.Visible := visible != 0
+                this.list.Redraw()
+            }
         }
-        this.Columns(this.list, [140, 480, 192])
-        this.bindList.Delete()
+        bindings := ''
         for item in this.binds
-            this.bindList.Add(, KeyLabel(item.key), item.text)
-        this.Columns(this.bindList, [220, 592])
+            bindings .= item.key '`t' item.text '`n'
+        if !this.HasOwnProp('bindSignature') || bindings != this.bindSignature {
+            this.bindList.Delete()
+            for item in this.binds
+                this.bindList.Add(, KeyLabel(item.key), item.text)
+            this.Columns(this.bindList, [220, 592])
+            this.bindSignature := bindings
+        }
         this.count.Text := 'Показано: ' this.rows.Length ' из ' this.config.entries.Length '    •    Набор: ' (this.gender = 'male' ? 'мужской' : 'женский') '    •    Замечаний: ' this.config.problems.Length
         this.UpdateStats()
         this.EmptyStates()
+    }
+
+    ScheduleSearch(*) {
+        SetTimer this.searchRefresh, -140
     }
 
     EmptyStates() {
@@ -399,10 +425,29 @@ class BinderView extends BinderFeatures {
         page := 'Change Log'
         this.Card(page, 272, 102, 884, 611)
         this.Button(page, 298, 125, 144, '← На главную', (*) => this.ShowPage('Основное'))
-        this.Label(page, 298, 196, 800, '0.4.0', 23, 'AD9BFF', 700, 40)
-        this.Label(page, 298, 244, 800, '18 ноября 2026  ·  Интерфейс и удобство', 10, '9999A8')
-        this.Label(page, 298, 290, 796, '• Название приложения — Binder by Hatiksu.`n• Все диалоги, редакторы и выбор файлов в общей тёмной теме.`n• Раздельные нормы репортов для будней и выходных.`n• Нужная норма автоматически выбирается в счётчике и оверлее.`n• Обновлена ссылка Discord, убраны стрелки прокрутки в полях.', 11, 'D0D0DA', , 150)
-        this.Label(page, 298, 478, 800, '0.2.0', 18, 'EEEEF2', 700, 32)
-        this.Label(page, 298, 523, 796, 'Профили, мужской и женский наборы, выбор фракции и /esp.`nСчётчик репортов, дневная норма, история и кастомные оверлеи.`nИмпорт, экспорт и категории триггеров.', 11, 'A9A9B7', , 100)
+        this.historyScroll := ScrollPage(this.window, 298, 180, 832, 507)
+        for entry in this.history
+            this.historyScroll.AddCard(entry.version, entry.lines, entry.version = this.version ? 'Текущая версия' : 'Предыдущая версия')
+        this.historyScroll.Finish()
+        this.pages[page].Push(this.historyScroll)
+    }
+
+    BuildGuide() {
+        page := 'Гайд'
+        this.Card(page, 272, 102, 884, 611)
+        this.Button(page, 298, 125, 144, '← На главную', (*) => this.ShowPage('Основное'))
+        this.guideScroll := ScrollPage(this.window, 298, 180, 832, 507)
+        steps := [
+            ['01  Профиль и персонаж', ['Выбери профиль в меню слева сверху. Каждый профиль хранит свои триггеры, бинды, оверлеи и статистику.', 'На главной выбери пол, фракцию LSPD / FIB / SANG / LSCSD и тип /esp. Discord-поля сохраняются сразу.']],
+            ['02  Триггеры', ['Открой чат игры, введи сокращение и нажми пробел. Например: .ключ. Триггер заменится текстом из выбранного набора.', 'В разделе «Триггеры» работают поиск, категории, редактор, импорт и экспорт .txt. Перед заменой конфигурации сохраняется резервная копия.']],
+            ['03  Бинды клавиш', ['Нажми «Добавить бинд», затем поле клавиш и введи сочетание. Esc отменяет запись, Backspace очищает поле.', 'Бинд открывает чат клавишей T и вставляет шаблон. Добавь {enter} в конце, если сообщение нужно отправить сразу.']],
+            ['04  Нормы и репорты', ['В разделе «Репорты» отдельно укажи нормы для будней и выходных и нажми «Сохранить». Суббота и воскресенье считаются выходными.', 'Маркер {rep} увеличивает локальный счётчик после выполнения шаблона. Он не проверяет ответ сервера — исправить число можно вручную.']],
+            ['05  Оверлеи', ['Включи счётчик или создай плашку с текстом и изображением. Поддерживаются {today}, {week}, {norm} и Discord-поля.', 'Нажми «Переместить», перетащи плашки и нажми «Готово». Оверлеи рассчитаны на оконный режим игры или режим без рамки.']],
+            ['06  Настройки игры', ['Укажи имя процесса игры, если оно отличается от GTA5.exe. Бинды и триггеры работают только в активном окне этого процесса.', 'Биндер работает, пока запущен .ahk. Закрытие основного окна убирает его в трей; для выхода выбери «Завершить работу».']],
+            ['07  Обновление', ['Кнопка «Обновления» открывает GitHub Releases. Скачай архив новой версии, закрой скрипт и распакуй исходники.', 'Сохрани папку data при обновлении: в ней находятся личные конфиги и статистика. Поддержка — по кнопке Discord на главной.']]]
+        for step in steps
+            this.guideScroll.AddCard(step[1], step[2])
+        this.guideScroll.Finish()
+        this.pages[page].Push(this.guideScroll)
     }
 }

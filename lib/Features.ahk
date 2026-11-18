@@ -19,6 +19,19 @@ class BinderFeatures {
         this.overlayKeys := []
         this.overlayMoving := false
         this.reportIni := this.dir '\reports.ini'
+        this.reportDays := Map()
+        if FileExist(this.reportIni) {
+            try {
+                for line in StrSplit(IniRead(this.reportIni, 'Daily'), '`n', '`r') {
+                    if RegExMatch(line, '^(\d{8})=(\d+)$', &record)
+                        this.reportDays[record[1]] := Integer(record[2])
+                }
+            }
+        }
+        this.lastDate := FormatTime(, 'yyyyMMdd')
+        this.statsSignature := ''
+        this.statsPaints := 0
+        this.overlayBuilds := 0
         this.overlayIni := this.dir '\overlays.ini'
         this.overlayEnabled := IniRead(this.ini, 'Overlay', 'Enabled', '0') = '1'
         this.overlayStyle := IniRead(this.ini, 'Overlay', 'Style', 'compact')
@@ -103,28 +116,31 @@ class BinderFeatures {
 
     SaveVariable(name, field, *) {
         IniWrite field.Value, this.ini, 'Variables', name
+        this.UpdateOverlayText()
     }
 
     ReportCounts(now := '') {
         if now = ''
             now := A_Now
         today := FormatTime(now, 'yyyyMMdd')
-        day := Integer(IniRead(this.reportIni, 'Daily', today, '0'))
+        day := this.reportDays.Get(today, 0)
         week := 0
         days := Mod(Integer(FormatTime(now, 'WDay')) + 5, 7)
         loop days + 1 {
             date := FormatTime(DateAdd(now, -(A_Index - 1), 'Days'), 'yyyyMMdd')
-            week += Integer(IniRead(this.reportIni, 'Daily', date, '0'))
+            week += this.reportDays.Get(date, 0)
         }
         return {day: day, week: week}
     }
 
     ChangeReports(delta, *) {
         today := FormatTime(, 'yyyyMMdd')
-        current := Integer(IniRead(this.reportIni, 'Daily', today, '0'))
-        IniWrite Max(0, current + delta), this.reportIni, 'Daily', today
+        current := this.reportDays.Get(today, 0)
+        next := Max(0, current + delta)
+        IniWrite next, this.reportIni, 'Daily', today
+        this.reportDays[today] := next
         this.UpdateStats()
-        this.RenderOverlays()
+        this.UpdateOverlayText()
     }
 
     SaveNorm(*) {
@@ -139,7 +155,7 @@ class BinderFeatures {
         IniWrite this.normWeekday, this.ini, 'Reports', 'WeekdayNorm'
         IniWrite this.normWeekend, this.ini, 'Reports', 'WeekendNorm'
         this.UpdateStats()
-        this.RenderOverlays()
+        this.UpdateOverlayText()
         this.Notify('Нормы для будней и выходных сохранены')
     }
 
@@ -157,13 +173,19 @@ class BinderFeatures {
     ResetReports(*) {
         if DarkDialog.Message('Обнулить счётчик за сегодня? История других дней сохранится.', 'Репорты', 'YesNo') = 'Yes' {
             IniWrite 0, this.reportIni, 'Daily', FormatTime(, 'yyyyMMdd')
+            this.reportDays[FormatTime(, 'yyyyMMdd')] := 0
             this.UpdateStats()
-            this.RenderOverlays()
+            this.UpdateOverlayText()
         }
     }
 
     UpdateStats(*) {
         stats := this.ReportCounts()
+        signature := FormatTime(, 'yyyyMMdd') '|' stats.day '|' stats.week '|' this.norm '|' this.config.entries.Length
+        if this.statsSignature = signature
+            return
+        this.statsSignature := signature
+        this.statsPaints += 1
         this.triggerStat.Text := this.config.entries.Length
         this.todayStat.Text := stats.day
         this.weekStat.Text := stats.week
@@ -177,7 +199,7 @@ class BinderFeatures {
             key := FormatTime(date, 'yyyyMMdd')
             tile := this.historyTiles[A_Index]
             tile.date.Text := A_Index = 1 ? 'Сегодня' : FormatTime(date, 'dd.MM')
-            tile.count.Text := IniRead(this.reportIni, 'Daily', key, '0')
+            tile.count.Text := this.reportDays.Get(key, 0)
         }
     }
 
@@ -217,6 +239,7 @@ class BinderFeatures {
     }
 
     RenderOverlays(*) {
+        this.overlayBuilds += 1
         this.SaveOverlayPositions()
         for item in this.overlayWindows
             item.gui.Destroy()
@@ -225,7 +248,7 @@ class BinderFeatures {
             return
         if this.overlayEnabled {
             stats := this.ReportCounts()
-            text := this.overlayStyle = 'compact' ? 'РЕПОРТЫ   ' stats.day ' / ' this.norm '     •     НЕДЕЛЯ   ' stats.week : 'Репорты за день: ' stats.day ' / ' this.norm '`nЗа неделю: ' stats.week
+            text := this.ReportOverlayText(stats)
             x := IniRead(this.ini, 'Overlay', 'X', '40')
             y := IniRead(this.ini, 'Overlay', 'Y', '60')
             this.CreateOverlay(0, text, '', x, y)
@@ -244,15 +267,15 @@ class BinderFeatures {
         if image != '' && FileExist(image) {
             try g.AddPicture('w240 h-1', image)
         }
-        if text != ''
-            g.AddText('w300', text)
+        textControl := g.AddText('w300', text = '' ? ' ' : text)
+        textControl.Visible := text != ''
         if this.overlayMoving {
             g.AddText('w300 cAA99FF', 'Перетащи окно • затем нажми «Готово»')
             for control in g
                 control.OnEvent('Click', (*) => PostMessage(0xA1, 2, 0, , g))
         } else
             g.Opt('+E0x20')
-        this.overlayWindows.Push({gui: g, index: index})
+        this.overlayWindows.Push({gui: g, index: index, textControl: textControl, text: text})
         ; If the stored monitor is disconnected, bring the overlay back on-screen.
         if x < -3000 || x > A_ScreenWidth || y < -3000 || y > A_ScreenHeight
             x := 40, y := 60
@@ -345,7 +368,7 @@ class BinderFeatures {
         d := DarkDialog.Window('Кастомный оверлей', 650)
         Theme.Window(d)
         d.MarginX := 24, d.MarginY := 20
-        d.AddText('w600', 'Название')
+        d.AddText('x24 y78 w600', 'Название')
         title := d.AddEdit('w600 Background252527 cEEEEF2', item.name)
         d.AddText('w600 y+20', 'Текст • {today}, {week}, {norm}, %dis%')
         body := d.AddEdit('w600 r3 Background252527 cEEEEF2', StrReplace(item.text, '\n', '`n'))
@@ -409,13 +432,7 @@ class BinderFeatures {
     }
 
     Guide(*) {
-        text := '1. Выбери или создай профиль слева сверху.`n`n2. На главной выбери пол, фракцию и тип /esp. Discord-поля сохраняются сразу.`n`n3. В «Триггерах» доступен поиск, категории, импорт и экспорт. В открытом чате введи сокращение, затем пробел.`n`n4. В «Биндах клавиш» нажми поле клавиш и введи сочетание. Esc отменяет запись, Backspace очищает поле. Бинд открывает чат клавишей T.`n`n5. В «Оверлеях» включи счётчик и создай свои плашки. Кнопка «Переместить» позволяет перетаскивать их; «Готово» сохраняет положение.`n`n6. {rep} в конце успешно отправленного шаблона увеличивает локальный счётчик репортов. Счётчик не читает данные сервера; его можно поправить вручную.`n`nБиндер работает, пока запущен скрипт. Оверлеи работают поверх оконного режима игры и режима без рамки.'
-        d := DarkDialog.Window('Как пользоваться Binder by Hatiksu', 720)
-        Theme.Window(d)
-        d.MarginX := 24, d.MarginY := 24
-        d.AddText('w670', text)
-        Theme.Button(d, 'w200 h38 y+20', 'Понятно', '765DFF').OnEvent('Click', (*) => d.Destroy())
-        d.Show()
+        this.ShowPage('Гайд')
     }
 
     Changelog(*) {
@@ -423,9 +440,30 @@ class BinderFeatures {
     }
 
     DailyRefresh() {
+        today := FormatTime(, 'yyyyMMdd')
+        if today = this.lastDate
+            return
+        this.lastDate := today
         this.UpdateStats()
-        if !this.overlayMoving
-            this.RenderOverlays()
+        this.UpdateOverlayText()
+    }
+
+    ReportOverlayText(stats) {
+        return this.overlayStyle = 'compact' ? 'РЕПОРТЫ   ' stats.day ' / ' this.norm '     •     НЕДЕЛЯ   ' stats.week : 'Репорты за день: ' stats.day ' / ' this.norm '`nЗа неделю: ' stats.week
+    }
+
+    UpdateOverlayText() {
+        stats := this.ReportCounts()
+        for item in this.overlayWindows {
+            text := item.index = 0 ? this.ReportOverlayText(stats) : this.OverlayText(this.customOverlays[item.index].text)
+            if text = item.text
+                continue
+            item.text := text
+            item.textControl.Text := text = '' ? ' ' : text
+            item.textControl.Visible := text != ''
+            if !this.overlayMoving && !(A_Args.Length && A_Args[1] = '--check')
+                item.gui.Show('AutoSize NoActivate')
+        }
     }
 
     PrepareCommands(text) {
