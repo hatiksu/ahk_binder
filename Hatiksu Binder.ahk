@@ -4,7 +4,7 @@
 OnError(CheckError)
 CheckError(err, mode) {
     if A_Args.Length && A_Args[1] = '--check' {
-        FileAppend err.Message ' at line ' err.Line '`n', '*'
+        FileAppend err.Message ' at ' err.File ':' err.Line '`n' err.Stack '`n', '*'
         ExitApp 1
     }
 }
@@ -12,11 +12,12 @@ SetWorkingDir A_ScriptDir
 SendMode 'Event'
 SetKeyDelay 25, 25
 
-class Binder {
+#Include lib\Theme.ahk
+#Include lib\Features.ahk
+#Include lib\View.ahk
+class Binder extends BinderView {
     __New() {
-        this.dir := A_ScriptDir '\data'
-        DirCreate this.dir
-        this.ini := this.dir '\settings.ini'
+        this.InitProfile()
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
             this.gender := 'male'
@@ -37,6 +38,10 @@ class Binder {
         Hotkey '^!F12', (*) => this.Toggle()
         A_TrayMenu.Add 'Открыть Hatiksu Binder', (*) => this.window.Show()
         A_TrayMenu.Add 'Пауза / продолжить', (*) => this.Toggle()
+        this.RenderOverlays()
+        OnExit((*) => this.SaveOverlayPositions())
+        if !(A_Args.Length && A_Args[1] = '--check')
+            SetTimer this.DailyRefresh.Bind(this), 60000
     }
 
     Parse(text) {
@@ -67,6 +72,8 @@ class Binder {
 
     Load() {
         this.config := this.Parse(FileRead(this.dir '\' this.gender '.txt', 'UTF-8'))
+        if this.HasOwnProp('category')
+            this.UpdateCategories()
         this.binds := []
         if FileExist(this.dir '\binds.txt') {
             for line in StrSplit(FileRead(this.dir '\binds.txt', 'UTF-8'), '`n', '`r') {
@@ -101,108 +108,6 @@ class Binder {
         this.Refresh()
     }
 
-    Build() {
-        g := Gui(, 'Hatiksu Binder')
-        this.window := g
-        g.BackColor := '19191D'
-        g.SetFont('s10 cEEEEF4', 'Segoe UI')
-        g.AddText('x24 y22 w220 h32 cA497FF', 'HATIKSU BINDER')
-        g.AddText('x265 y24 w570', 'GTA V  /  Majestic RP')
-        this.state := g.AddText('x855 y24 w220', '● Включён')
-        this.pages := Map()
-        for i, name in ['Основное', 'Триггеры', 'Бинды клавиш', 'Настройки'] {
-            button := g.AddButton('x20 y' (92 + (i - 1) * 48) ' w210 h38', name)
-            button.OnEvent('Click', this.ShowPage.Bind(this, name))
-            this.pages[name] := []
-        }
-        g.AddText('x24 y490 w205 h64 c9999AA', 'AutoHotkey v2`nCtrl + Alt + F12 — пауза')
-        g.AddButton('x20 y562 w210 h34', 'Пауза / продолжить').OnEvent('Click', (*) => this.Toggle())
-        this.Add('Основное', 'Text', 'x270 y86 w760 h36', 'Твой биндер. Твои команды.')
-        this.summary := this.Add('Основное', 'Text', 'x270 y145 w730 h85', '')
-        this.Add('Основное', 'Text', 'x270 y240 w730 h90 cAAAAAA', 'Триггеры заменяют сокращения в открытом чате игры.`nБинды открывают чат клавишей T и выполняют заданный текст.`nВсе изменения сохраняются автоматически.')
-        this.Add('Основное', 'Button', 'x270 y365 w240 h40', 'Перейти к триггерам').OnEvent('Click', this.ShowPage.Bind(this, 'Триггеры'))
-
-        this.Add('Триггеры', 'Text', 'x270 y80 w760', 'Триггеры • конфиги мужского и женского пола')
-        this.sex := this.Add('Триггеры', 'DropDownList', 'x270 y115 w170 Choose' (this.gender = 'male' ? 1 : 2), ['Мужской', 'Женский'])
-        this.sex.OnEvent('Change', (*) => this.ChangeGender())
-        this.search := this.Add('Триггеры', 'Edit', 'x455 y115 w280 h28 c111111', '')
-        this.search.OnEvent('Change', (*) => this.Refresh())
-        this.Add('Триггеры', 'Button', 'x748 y114 w120 h30', 'Импорт').OnEvent('Click', (*) => this.Import())
-        this.Add('Триггеры', 'Button', 'x880 y114 w120 h30', 'Экспорт').OnEvent('Click', (*) => this.Export())
-        this.list := this.Add('Триггеры', 'ListView', 'x270 y160 w760 h340 c111111 -Multi', ['Триггер', 'Текст', 'Категория'])
-        this.list.OnEvent('DoubleClick', (*) => this.EditTrigger())
-        this.Add('Триггеры', 'Button', 'x270 y515 w145 h34', 'Добавить').OnEvent('Click', (*) => this.EditTrigger(true))
-        this.Add('Триггеры', 'Button', 'x425 y515 w145 h34', 'Изменить').OnEvent('Click', (*) => this.EditTrigger())
-        this.Add('Триггеры', 'Button', 'x580 y515 w145 h34', 'Удалить').OnEvent('Click', (*) => this.DeleteTrigger())
-        this.Add('Триггеры', 'Button', 'x735 y515 w295 h34', 'Диагностика конфига').OnEvent('Click', (*) => this.Diagnostics())
-        this.count := this.Add('Триггеры', 'Text', 'x270 y565 w760 h30', '')
-
-        this.Add('Бинды клавиш', 'Text', 'x270 y80 w760', 'Бинды клавиш • сочетание → текст в чат')
-        this.bindList := this.Add('Бинды клавиш', 'ListView', 'x270 y125 w760 h365 c111111 -Multi', ['Клавиши', 'Текст / действия'])
-        this.bindList.OnEvent('DoubleClick', (*) => this.EditBind())
-        this.Add('Бинды клавиш', 'Button', 'x270 y515 w160 h36', 'Добавить бинд').OnEvent('Click', (*) => this.EditBind(true))
-        this.Add('Бинды клавиш', 'Button', 'x445 y515 w160 h36', 'Изменить').OnEvent('Click', (*) => this.EditBind())
-        this.Add('Бинды клавиш', 'Button', 'x620 y515 w160 h36', 'Удалить').OnEvent('Click', (*) => this.DeleteBind())
-
-        this.Add('Настройки', 'Text', 'x270 y80 w760', 'Настройки')
-        this.Add('Настройки', 'Text', 'x270 y130 w700', 'Процесс игры (биндер работает только в этом окне)')
-        this.exe := this.Add('Настройки', 'Edit', 'x270 y158 w450 c111111', this.process)
-        this.variables := Map()
-        for i, name in ['dis', 'gadis', 'zgadis'] {
-            this.Add('Настройки', 'Text', 'x270 y' (220 + (i - 1) * 65) ' w650', '%' name '% — Discord')
-            this.variables[name] := this.Add('Настройки', 'Edit', 'x270 y' (245 + (i - 1) * 65) ' w450 c111111', IniRead(this.ini, 'Variables', name, ''))
-        }
-        this.Add('Настройки', 'Text', 'x270 y445 w730 h55', 'Поддерживаются {enter}, {tab}, {esc}. Неизвестные маркеры,`nвключая {rep}, сохраняются в конфиге и пропускаются при отправке.')
-        this.Add('Настройки', 'Button', 'x270 y520 w230 h38', 'Сохранить настройки').OnEvent('Click', (*) => this.SaveSettings())
-        g.OnEvent('Close', (*) => g.Hide())
-        this.Refresh()
-        this.ShowPage('Основное')
-        if !(A_Args.Length && A_Args[1] = '--check')
-            g.Show('w1060 h625')
-    }
-
-    Add(page, type, options, value) {
-        c := this.window.Add(type, options, value)
-        this.pages[page].Push(c)
-        return c
-    }
-
-    ShowPage(name, *) {
-        for page, controls in this.pages
-            for control in controls
-                control.Visible := page = name
-    }
-
-    Refresh() {
-        this.list.Delete()
-        this.rows := []
-        needle := this.search.Value
-        for item in this.config.entries {
-            if needle != '' && !InStr(item.key ' ' item.text ' ' item.category, needle)
-                continue
-            this.rows.Push(item)
-            this.list.Add(, item.key, item.text, item.category)
-        }
-        this.list.ModifyCol(1, 125)
-        this.list.ModifyCol(2, 440)
-        this.list.ModifyCol(3, 170)
-        this.bindList.Delete()
-        for item in this.binds
-            this.bindList.Add(, item.key, item.text)
-        this.bindList.ModifyCol(1, 160)
-        this.bindList.ModifyCol(2, 570)
-        this.count.Text := 'Показано: ' this.rows.Length ' • Замечаний: ' this.config.problems.Length
-        this.summary.Text := 'Триггеров: ' this.config.entries.Length '     Биндов: ' this.binds.Length '`nНабор: ' (this.gender = 'male' ? 'мужской' : 'женский') '`nПроцесс игры: ' this.process
-    }
-
-    ChangeGender() {
-        this.gender := this.sex.Value = 1 ? 'male' : 'female'
-        IniWrite this.gender, this.ini, 'General', 'Gender'
-        this.Load()
-        this.Activate()
-        this.Refresh()
-    }
-
     EditTrigger(fresh := false) {
         index := this.list.GetNext()
         if !fresh && !index
@@ -213,13 +118,18 @@ class Binder {
 
     Editor(title, key, text, save, isBind := false) {
         d := Gui('+Owner' this.window.Hwnd, title)
-        d.SetFont('s10', 'Segoe UI')
+        Theme.Window(d)
+        d.MarginX := 24, d.MarginY := 24
         d.AddText('w650', isBind ? 'Нажми сочетание клавиш' : 'Триггер (например /ltk или .ключ)')
-        k := d.Add(isBind ? 'Hotkey' : 'Edit', 'w650', key)
+        k := d.Add(isBind ? 'Hotkey' : 'Edit', 'w650 h32' (isBind ? '' : ' Background252527 cEEEEF2'), key)
+        Theme.Dark(k)
         d.AddText('w650', 'Текст и действия: {enter}, {tab}, {esc}')
-        t := d.AddEdit('w650 r8', text)
-        d.AddButton('w180 Default', 'Сохранить').OnEvent('Click', Commit)
-        d.Show()
+        t := d.AddEdit('w650 r8 Background252527 cEEEEF2', text)
+        Theme.Dark(t)
+        saveButton := Theme.Button(d, 'w180 h38 y+20 Default', 'Сохранить', '765DFF')
+        saveButton.OnEvent('Click', Commit)
+        this.editorFields := {gui: d, key: k, body: t, save: saveButton}
+        d.Show(A_Args.Length && A_Args[1] = '--check' ? 'Hide' : '')
         Commit(*) {
             if Trim(k.Value) = '' || Trim(t.Value) = '' {
                 MsgBox 'Заполни оба поля.'
@@ -311,7 +221,8 @@ class Binder {
     Diagnostics() {
         report := this.config.problems.Length ? this.Join(this.config.problems) : 'Ошибок формата и повторов нет.'
         d := Gui('+Owner' this.window.Hwnd, 'Диагностика — исходные строки сохранены')
-        d.AddEdit('w780 r22 ReadOnly', report)
+        Theme.Window(d)
+        d.AddEdit('w780 r22 ReadOnly Background252527 cEEEEF2', report)
         d.Show()
     }
 
@@ -331,6 +242,12 @@ class Binder {
         for n, item in this.binds {
             if n != index && item.key = key {
                 MsgBox 'Это сочетание уже занято.'
+                return false
+            }
+        }
+        for item in this.customOverlays {
+            if item.key != '' && item.key = key {
+                MsgBox 'Это сочетание занято оверлеем.'
                 return false
             }
         }
@@ -364,12 +281,17 @@ class Binder {
             MsgBox 'Укажи имя процесса, например GTA5.exe.'
             return
         }
+        if this.factionId.Value != '' && !RegExMatch(this.factionId.Value, '^\d+$') {
+            this.Notify('ID фракции должен быть числом или пустым полем.')
+            return
+        }
         this.process := Trim(this.exe.Value)
         IniWrite this.process, this.ini, 'General', 'Process'
+        IniWrite this.factionId.Value, this.ini, 'FactionIDs', this.faction
         for name, field in this.variables
             IniWrite field.Value, this.ini, 'Variables', name
         this.Refresh()
-        MsgBox 'Настройки сохранены.'
+        this.Notify('Настройки сохранены')
     }
 
     Activate() {
@@ -400,6 +322,7 @@ class Binder {
         }
         HotIf
         this.config.problems.Push(failures*)
+        this.BindOverlayKeys()
     }
 
     Emit(text, openChat, *) {
@@ -407,6 +330,7 @@ class Binder {
             return
         for name, field in this.variables
             text := StrReplace(text, '%' name '%', field.Value)
+        text := this.PrepareCommands(text)
         if openChat {
             for modifier in ['Ctrl', 'Alt', 'Shift', 'LWin', 'RWin']
                 KeyWait modifier
@@ -415,7 +339,7 @@ class Binder {
             SendEvent 't'
             Sleep 180
         }
-        pos := 1
+        pos := 1, pendingReport := false
         while RegExMatch(text, '\{([^{}]+)\}', &m, pos) {
             if !this.context()
                 return
@@ -424,16 +348,25 @@ class Binder {
             if token = 'enter' || token = 'tab' || token = 'esc' {
                 SendEvent '{' token '}'
                 Sleep 100
-            }
+            } else if RegExMatch(token, '^(left|right|space)(?: (\d{1,3}))?$', &action) {
+                count := action[2] = '' ? 1 : Min(100, Integer(action[2]))
+                SendEvent '{' action[1] ' ' count '}'
+            } else if token = '!'
+                SendText '!'
+            else if token = 'rep'
+                pendingReport := true
             pos := m.Pos + m.Len
         }
-        if this.context()
+        if this.context() {
             SendText SubStr(text, pos)
+            if pendingReport
+                this.ChangeReports(1)
+        }
     }
 
     Toggle() {
         this.enabled := !this.enabled
-        this.state.Text := this.enabled ? '● Включён' : '● На паузе'
+        this.state.Text := this.enabled ? '● Биндер включён' : '○ Биндер на паузе'
     }
 }
 
@@ -471,9 +404,102 @@ RunChecks() {
             throw Error('Search filtering failed')
     }
     FileAppend 'OK: duplicate detection, malformed lines, action preservation, pages, search`n', '*'
+    for name in ['Оверлеи', 'Репорты', 'Бинды клавиш', 'Триггеры', 'Настройки', 'Основное'] {
+        CheckClick(app.nav[name])
+        if app.currentPage != name
+            throw Error('Не работает кнопка раздела: ' name)
+    }
+    for faction in ['LSPD', 'FIB', 'SANG', 'LSCSD', 'Все'] {
+        CheckClick(app.factionButtons[faction])
+        if app.faction != faction
+            throw Error('Не работает кнопка фракции: ' faction)
+    }
+    CheckClick(app.genderButtons['female'])
+    if app.gender != 'female'
+        throw Error('Не работает женский набор')
+    CheckClick(app.genderButtons['male'])
+    if app.gender != 'male'
+        throw Error('Не работает мужской набор')
+    CheckClick(app.espButtons[2])
+    if app.PrepareCommands('/esp 3') != '/esp 2'
+        throw Error('Не работает выбор /esp')
+    app.ShowPage('Бинды клавиш')
+    CheckClickText(app, 'Бинды клавиш', '+ Добавить бинд')
+    app.editorFields.key.Value := '^!F10'
+    app.editorFields.body.Value := 'Проверка.{enter}'
+    CheckClick(app.editorFields.save)
+    app.Load()
+    if app.binds.Length != 1 || app.binds[1].key != '^!F10'
+        throw Error('Не работает сохранение биндa через кнопку')
+    app.ShowPage('Триггеры')
+    app.search.Value := ''
+    app.Refresh()
+    CheckClickText(app, 'Триггеры', '+ Добавить')
+    app.editorFields.key.Value := '/hatiksu_test'
+    app.editorFields.body.Value := 'Проверка.{enter}{rep}'
+    CheckClick(app.editorFields.save)
+    if app.config.entries.Length != 1544
+        throw Error('Не работает сохранение триггера через кнопку')
+    app.ShowPage('Репорты')
+    CheckClickText(app, 'Репорты', '+ Принят репорт')
+    if app.ReportCounts().day != 1
+        throw Error('Не работает счётчик репортов')
+    CheckClickText(app, 'Репорты', '− Убрать 1')
+    if app.ReportCounts().day != 0
+        throw Error('Не работает коррекция счётчика')
+    app.ShowPage('Оверлеи')
+    CheckClick(app.overlayToggle)
+    if !app.overlayEnabled
+        throw Error('Не работает включение оверлея')
+    CheckClick(app.classicButton)
+    if app.overlayStyle != 'classic'
+        throw Error('Не работает стиль оверлея')
+    CheckClickText(app, 'Оверлеи', '+ Создать оверлей')
+    app.overlayEditor.title.Value := 'Проверка'
+    app.overlayEditor.body.Value := 'Репорты: {today} / {norm}'
+    app.overlayEditor.key.Value := '^!F11'
+    CheckClick(app.overlayEditor.save)
+    if app.customOverlays.Length != 1 || app.overlayKeys.Length != 1
+        throw Error('Не работает сохранение оверлея')
+    app.ToggleCustomOverlay(1)
+    if app.customOverlays[1].enabled
+        throw Error('Не работает переключение оверлея')
+    app.ShowPage('Настройки')
+    app.exe.Value := 'GTA5_Enhanced.exe'
+    CheckClickText(app, 'Настройки', 'Сохранить настройки')
+    if IniRead(app.ini, 'General', 'Process') != 'GTA5_Enhanced.exe'
+        throw Error('Не работает сохранение настроек')
+    if !app.CreateProfileMenu().Handle
+        throw Error('Не работает меню профилей')
+    app.CreateOverlay(0, 'Проверка счётчика', '', 40, 60)
+    CheckClick(app.moveButton)
+    if !app.overlayMoving
+        throw Error('Не работает режим перемещения оверлея')
+    CheckClick(app.moveButton)
+    if app.overlayMoving
+        throw Error('Не работает сохранение положения оверлея')
+    for hwnd, item in Theme.items {
+        if DllCall('IsWindow', 'ptr', hwnd)
+            SendMessage 0xF, 0, 0, hwnd
+    }
+    FileAppend 'OK: native button events, 6 pages, factions, gender, ESP, bind and trigger persistence, reports, overlays, settings`n', '*'
     ExitApp
+}
+
+CheckClick(control) {
+    SendMessage 0xF5, 0, 0, control
+    Sleep 80
+}
+
+CheckClickText(app, page, label) {
+    for control in app.pages[page] {
+        if control.Type = 'Button' && control.Text = label {
+            CheckClick(control)
+            return
+        }
+    }
+    throw Error('Не найдена кнопка: ' label)
 }
 if A_Args.Length && A_Args[1] = '--check'
     RunChecks()
 rootBinder := Binder()
-
