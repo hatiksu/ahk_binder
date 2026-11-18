@@ -28,12 +28,13 @@ SetKeyDelay 25, 25
 #Include lib\ScrollPage.ahk
 #Include lib\ReportCounter.ahk
 #Include lib\ReportDetector.ahk
+#Include lib\ReportOverlay.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.8.0'
+        this.version := '0.8.1'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -674,14 +675,11 @@ RunChecks() {
     if app.config.entries.Length != 1544
         throw Error('Не работает сохранение триггера через кнопку')
     app.ShowPage('Репорты')
-    CheckClickText(app, 'Репорты', '+ Принят репорт')
+    ReportCounter.Accept(app, '10000001', FormatTime(, 'yyyyMMddHHmmss'))
     if app.ReportCounts().day != 1
         throw Error('Не работает счётчик репортов')
     if app.historyTiles.Length != 14 || app.historyTiles[1].count.Text != '1'
         throw Error('Не обновляется история репортов')
-    CheckClickText(app, 'Репорты', '− Убрать 1')
-    if app.ReportCounts().day != 0
-        throw Error('Не работает коррекция счётчика')
     app.ShowPage('Оверлеи')
     CheckClick(app.overlayToggle)
     if !app.overlayEnabled
@@ -732,15 +730,6 @@ RunChecks() {
     SetTimer((*) => CheckClick(DarkDialog.last.buttons[2]), -100)
     if DarkDialog.Message('Проверка отмены', 'Подтверждение', 'YesNo') != 'No'
         throw Error('Не работает отмена в тёмном диалоге')
-    app.ChangeReports(1)
-    SetTimer((*) => CheckClick(DarkDialog.last.buttons[2]), -100)
-    app.ResetReports()
-    if app.ReportCounts().day != 1
-        throw Error('Отмена сброса изменила счётчик')
-    SetTimer((*) => CheckClick(DarkDialog.last.buttons[1]), -100)
-    app.ResetReports()
-    if app.ReportCounts().day != 0
-        throw Error('Подтверждённый сброс не выполнен')
     SetTimer(FillPrompt, -100)
     prompt := DarkDialog.Prompt('Введите название', 'Новый профиль')
     if prompt.Result != 'OK' || prompt.Value != 'Проверка'
@@ -762,10 +751,10 @@ RunChecks() {
     }
     if app.overlayBuilds != builds || app.statsPaints != paints
         throw Error('Фоновое обновление повторно строит неизменившийся интерфейс')
-    app.ChangeReports(1)
+    ReportCounter.Accept(app, '10000002', FormatTime(, 'yyyyMMddHHmmss'))
     if app.overlayWindows[1].gui.Hwnd != overlayHandle || app.overlayBuilds != builds
         throw Error('Изменение счётчика пересоздало окно оверлея')
-    if !InStr(app.overlayWindows[1].textControl.Text, '1 /')
+    if !InStr(app.overlayWindows[1].textControl.Text, app.ReportCounts().day ' /')
         throw Error('Текст оверлея не обновился')
     app.ShowPage('Триггеры')
     app.search.Value := ''
@@ -838,18 +827,18 @@ RunChecks() {
     date := FormatTime(, 'yyyyMMddHHmmss')
     if !ReportCounter.Accept(app, '23267105', date) || ReportCounter.Accept(app, '23267105', date)
         throw Error('Не работает защита от повторного подсчёта')
-    app.ChangeReports(-1)
     restored := {}
     ObjSetBase(restored, Binder.Prototype)
     restored.InitProfile()
-    if restored.ReportCounts().day != beforeAuto || !restored.autoClosed.Has('23267105')
-        throw Error('После перезапуска потерялась коррекция или защита от дублей')
-    SetTimer((*) => CheckClick(DarkDialog.last.buttons[1]), -100)
-    app.ResetReports()
-    restored.InitProfile()
-    if restored.ReportCounts().day != 0
-        throw Error('Автоматические репорты вернулись после обнуления')
-    FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and corrections`n', '*'
+    if restored.ReportCounts().day != beforeAuto + 1 || !restored.autoClosed.Has('23267105')
+        throw Error('После перезапуска потерялся счётчик или защита от дублей')
+    app.overlayMoving := true
+    movingHUD := ReportOverlay(app, 40, 60)
+    if movingHUD.gui.BackColor != '202023'
+        throw Error('Не работает режим перемещения прозрачного оверлея')
+    movingHUD.gui.Destroy()
+    app.overlayMoving := false
+    FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and automatic totals`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp
     FillPrompt() {

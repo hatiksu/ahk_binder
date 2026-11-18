@@ -160,16 +160,6 @@ class BinderFeatures {
         return {day: day, week: week}
     }
 
-    ChangeReports(delta, *) {
-        today := FormatTime(, 'yyyyMMdd')
-        current := this.reportDays.Get(today, 0)
-        next := Max(0, current + delta)
-        IniWrite next - this.autoDays.Get(today, 0), this.reportIni, 'Daily', today
-        this.reportDays[today] := next
-        this.UpdateStats()
-        this.UpdateOverlayText()
-    }
-
     SaveNorm(*) {
         for field in [this.weekdayNormField, this.weekendNormField] {
             if !RegExMatch(field.Value, '^\d{1,5}$') || Integer(field.Value) < 1 {
@@ -195,15 +185,6 @@ class BinderFeatures {
 
     norm {
         get => this.NormForDay()
-    }
-
-    ResetReports(*) {
-        if DarkDialog.Message('Обнулить счётчик за сегодня? История других дней сохранится.', 'Репорты', 'YesNo') = 'Yes' {
-            IniWrite -this.autoDays.Get(FormatTime(, 'yyyyMMdd'), 0), this.reportIni, 'Daily', FormatTime(, 'yyyyMMdd')
-            this.reportDays[FormatTime(, 'yyyyMMdd')] := 0
-            this.UpdateStats()
-            this.UpdateOverlayText()
-        }
     }
 
     UpdateStats(*) {
@@ -289,6 +270,11 @@ class BinderFeatures {
     }
 
     CreateOverlay(index, text, image, x, y) {
+        if index = 0 {
+            hud := ReportOverlay(this, x, y)
+            this.overlayWindows.Push({gui: hud.gui, index: 0, textControl: hud.day.front, text: text, hud: hud})
+            return
+        }
         g := Gui('+AlwaysOnTop -Caption +ToolWindow +E0x08000000', 'Binder by Hatiksu • оверлей')
         Theme.Window(g)
         g.MarginX := 16, g.MarginY := 12
@@ -484,6 +470,11 @@ class BinderFeatures {
     UpdateOverlayText() {
         stats := this.ReportCounts()
         for item in this.overlayWindows {
+            if item.HasOwnProp('hud') {
+                item.hud.Update(stats)
+                item.text := this.ReportOverlayText(stats)
+                continue
+            }
             text := item.index = 0 ? this.ReportOverlayText(stats) : this.OverlayText(this.customOverlays[item.index].text)
             if text = item.text
                 continue
