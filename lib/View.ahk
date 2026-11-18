@@ -12,6 +12,7 @@ class BinderView extends BinderFeatures {
         this.profileButton := Theme.Button(g, 'x18 y80 w210 h44', '●  ' this.profile '      ⌄', '18181A')
         this.profileButton.OnEvent('Click', this.ProfileMenu.Bind(this))
         this.pages := Map(), this.nav := Map()
+        this.tables := Map()
         names := ['Основное', 'Оверлеи', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Настройки']
         symbols := ['⌂', '▱', '⌨', 'ϟ', '▣', '⚙']
         for i, name in names {
@@ -24,8 +25,6 @@ class BinderView extends BinderFeatures {
             this.nav[name] := button
             this.pages[name] := []
         }
-        this.state := g.AddText('x28 y613 w190 h22 cA99AFF BackgroundTrans', '● Биндер включён')
-        Theme.Button(g, 'x24 y645 w198 h34', 'Пауза  ·  Ctrl+Alt+F12', '252527').OnEvent('Click', (*) => this.Toggle())
         g.AddText('x24 y704 w200 h22 c77777F Center BackgroundTrans', 'Hatiksu  /  Majestic RP')
         this.pageTitle := g.AddText('x272 y25 w740 h30 BackgroundTrans', 'Основное')
         this.pageTitle.SetFont('s17 w700')
@@ -41,6 +40,8 @@ class BinderView extends BinderFeatures {
         this.BuildSettings()
         this.BuildOverlayPage()
         this.BuildReports()
+        this.pages['Change Log'] := []
+        this.BuildChangelog()
         Theme.Restack()
         DllCall('SetWindowPos', 'ptr', sidebar.Hwnd, 'ptr', 1, 'int', 0, 'int', 0, 'int', 0, 'int', 0, 'uint', 0x13)
         g.OnEvent('Close', (*) => g.Hide())
@@ -58,9 +59,30 @@ class BinderView extends BinderFeatures {
     Add(page, type, options, value) {
         if type = 'Button'
             c := Theme.Button(this.window, options, value)
+        else if type = 'ListView' {
+            customHeader := !InStr(options, '-Hdr')
+            c := this.window.AddListView(options ' -Hdr -LV0x1 Background1C1C1F cE6E6ED -E0x200', value)
+            Theme.Dark(c)
+            Theme.List(c, value.Length)
+            c.GetPos(&x, &y, &w, &h)
+            labels := []
+            if customHeader {
+                panel := Theme.Panel(this.window, 'x' x ' y' y ' w' w ' h38', '242427')
+                this.pages[page].Push(panel)
+                for index, title in value {
+                    label := this.window.AddText('x' (x + 14) ' y' (y + 9) ' w100 h22 Background242427 cA9A9B7', title)
+                    label.SetFont('s9 w600')
+                    labels.Push(label)
+                    this.pages[page].Push(label)
+                }
+                c.Move(x, y + 40, w, h - 40)
+            } else
+                panel := 0
+            this.tables[c.Hwnd] := {control: c, panel: panel, labels: labels, x: x, y: y, width: w}
+        }
         else {
-            if type = 'Edit' || type = 'Hotkey'
-                options .= ' Background171719 cEEEEF2 -E0x200'
+            if type = 'Edit'
+                options .= ' Background171719 cEEEEF2 -E0x200 -Multi -VScroll'
             else if type = 'ListView'
                 options .= ' Background1D1D1F cDEDEE5 -E0x200'
             else if type = 'Text'
@@ -71,6 +93,26 @@ class BinderView extends BinderFeatures {
         }
         this.pages[page].Push(c)
         return c
+    }
+
+    Columns(c, widths) {
+        table := this.tables[c.Hwnd]
+        offset := 0
+        for index, width in widths {
+            c.ModifyCol(index, width)
+            if table.labels.Length >= index
+                table.labels[index].Move(table.x + offset + 14, table.y + 9, Max(30, width - 24), 22)
+            offset += width
+        }
+    }
+
+    TableVisible(c, visible) {
+        c.Visible := visible
+        table := this.tables[c.Hwnd]
+        if table.panel
+            table.panel.Visible := visible
+        for label in table.labels
+            label.Visible := visible
     }
 
     Label(page, x, y, w, text, size := 10, color := 'EEEEF2', weight := 400, h := 24) {
@@ -101,15 +143,15 @@ class BinderView extends BinderFeatures {
             this.Card(page, x, 115, 196, 78, '222224')
             caption := this.Label(page, x + 16, 129, 170, title, 9, 'C9C9D0', 600)
             caption.Opt('Background222224')
-            value := this.Label(page, x + 16, 153, 165, i = 4 ? '0.2.0' : '0', 16, i = 2 ? 'ED6969' : 'FFFFFF', 700, 30)
+            value := this.Label(page, x + 16, 153, 165, i = 4 ? '0.3.0' : '0', 16, i = 2 ? 'ED6969' : 'FFFFFF', 700, 30)
             value.Opt('Background222224')
             values.Push(value)
         }
         this.triggerStat := values[1], this.todayStat := values[2], this.weekStat := values[3]
         this.Label(page, 298, 219, 700, 'Быстрые действия', 13, , 700)
-        this.Button(page, 298, 254, 170, '▤  Что нового', this.Changelog.Bind(this))
-        this.Button(page, 480, 254, 170, '↻  Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder'))
-        this.Button(page, 662, 254, 170, '⌘  GitHub', (*) => Run('https://github.com/hatiksu/ahk_binder'), true)
+        this.Button(page, 298, 254, 170, '▤  Change Log', (*) => this.ShowPage('Change Log'))
+        this.Button(page, 480, 254, 170, '↻  Обновления', (*) => Run('https://github.com/hatiksu/ahk_binder/commits/main'))
+        this.Button(page, 662, 254, 170, '◉  Discord', (*) => Run('https://discord.gg/DYUWSWgUnJ'), true)
         this.Button(page, 844, 254, 170, 'ⓘ  Пройти гайд', this.Guide.Bind(this))
         this.Label(page, 298, 322, 700, '⌁  Рабочее пространство', 13, , 700)
         this.Button(page, 298, 357, 238, '▣  Открыть конфиги профиля', (*) => Run(this.dir))
@@ -160,12 +202,14 @@ class BinderView extends BinderFeatures {
                 categories.Push(item.category)
             }
         }
-        this.category := this.Add(page, 'DropDownList', 'x674 y127 w208 Choose1', categories)
-        this.category.OnEvent('Change', (*) => this.Refresh())
+        this.category := CategoryPicker(this.window, 'x674 y126 w208 h34', categories, (*) => this.Refresh())
+        this.pages[page].Push(this.category.control)
         this.Button(page, 896, 126, 106, '↓ Импорт', (*) => this.Import(), false, 34)
         this.Button(page, 1014, 126, 116, '↑ Экспорт', (*) => this.Export(), true, 34)
         this.list := this.Add(page, 'ListView', 'x298 y182 w832 h410 -Multi', ['Триггер', 'Текст / действия', 'Категория'])
         this.list.OnEvent('DoubleClick', (*) => this.EditTrigger())
+        this.triggerEmpty := this.Label(page, 350, 338, 730, 'Ничего не найдено. Попробуй другой запрос или категорию.', 11, '9999A8', , 60)
+        this.triggerEmpty.Opt('Center')
         this.Button(page, 298, 615, 164, '+ Добавить', (*) => this.EditTrigger(true), true)
         this.Button(page, 474, 615, 150, 'Изменить', (*) => this.EditTrigger())
         this.Button(page, 636, 615, 140, 'Удалить', (*) => this.DeleteTrigger())
@@ -176,9 +220,16 @@ class BinderView extends BinderFeatures {
     BuildBinds() {
         page := 'Бинды клавиш'
         this.Card(page, 272, 102, 884, 611)
-        this.Label(page, 298, 125, 810, 'Сочетание клавиш → открыть чат → выполнить шаблон', 10, 'A9A9B3')
+        this.Label(page, 298, 125, 810, 'Быстрые команды на удобных сочетаниях клавиш', 11, 'A9A9B3')
+        this.bindEmptyPanel := this.Card(page, 298, 173, 832, 416, '1B1B1E')
         this.bindList := this.Add(page, 'ListView', 'x298 y173 w832 h416 -Multi', ['Клавиши', 'Текст / действия'])
         this.bindList.OnEvent('DoubleClick', (*) => this.EditBind())
+        this.bindEmptyIcon := this.Label(page, 660, 280, 110, '⌨', 32, '9B86FF', , 55)
+        this.bindEmptyIcon.Opt('Center Background1B1B1E')
+        this.bindEmptyTitle := this.Label(page, 460, 353, 510, 'Пока нет биндов', 16, 'EEEEF2', 600, 34)
+        this.bindEmptyTitle.Opt('Center Background1B1B1E')
+        this.bindEmptyHint := this.Label(page, 420, 405, 590, 'Назначь сочетание клавиш и добавь текст команды.`nНажми «Добавить бинд», чтобы создать первый.', 11, '9999A8', , 60)
+        this.bindEmptyHint.Opt('Center Background1B1B1E')
         this.Button(page, 298, 615, 180, '+ Добавить бинд', (*) => this.EditBind(true), true)
         this.Button(page, 490, 615, 150, 'Изменить', (*) => this.EditBind())
         this.Button(page, 652, 615, 150, 'Удалить', (*) => this.DeleteBind())
@@ -223,12 +274,15 @@ class BinderView extends BinderFeatures {
         this.Label(page, 298, 385, 600, 'Кастомные оверлеи', 13, , 700)
         this.Label(page, 298, 417, 620, 'Создавайте свои оверлеи с текстом, картинками и биндами клавиш', 10, 'A9A9B3')
         this.Button(page, 946, 384, 184, '+ Создать оверлей', (*) => this.EditOverlay(true), true)
+        this.customEmptyPanel := this.Card(page, 298, 461, 832, 155, '1B1B1E')
         this.customList := this.Add(page, 'ListView', 'x298 y461 w832 h155 -Multi -Hdr', ['', 'Название', 'Клавиши', 'Содержимое'])
         this.customList.OnEvent('DoubleClick', (*) => this.EditOverlay())
         this.customEmpty := this.Label(page, 335, 511, 750, '✦   Нет созданных оверлеев. Нажмите кнопку выше, чтобы добавить первый.', 10, '9999A5', , 55)
-        this.Button(page, 298, 641, 160, 'Изменить', (*) => this.EditOverlay())
-        this.Button(page, 470, 641, 180, 'Показать / скрыть', (*) => this.SelectedOverlayToggle())
-        this.Button(page, 662, 641, 140, 'Удалить', this.DeleteOverlay.Bind(this))
+        this.customEmpty.Opt('Center Background1B1B1E')
+        this.overlayActions := [
+            this.Button(page, 298, 641, 160, 'Изменить', (*) => this.EditOverlay()),
+            this.Button(page, 470, 641, 180, 'Показать / скрыть', (*) => this.SelectedOverlayToggle()),
+            this.Button(page, 662, 641, 140, 'Удалить', this.DeleteOverlay.Bind(this))]
     }
 
     SelectedOverlayToggle() {
@@ -242,21 +296,36 @@ class BinderView extends BinderFeatures {
         this.Card(page, 272, 102, 884, 611)
         this.Label(page, 298, 127, 700, 'Статистика репортов', 13, , 700)
         this.Card(page, 298, 175, 395, 100, '222224')
-        this.Label(page, 318, 190, 340, 'Сегодня / дневная норма', 10, 'B8B8C0')
+        caption := this.Label(page, 318, 190, 340, 'Сегодня / дневная норма', 10, 'B8B8C0')
+        caption.Opt('Background222224')
         this.reportToday := this.Label(page, 318, 220, 340, '', 22, 'B49FFF', 700, 40)
+        this.reportToday.Opt('Background222224')
         this.Card(page, 711, 175, 419, 100, '222224')
-        this.Label(page, 731, 190, 360, 'За текущую неделю', 10, 'B8B8C0')
+        caption := this.Label(page, 731, 190, 360, 'За текущую неделю', 10, 'B8B8C0')
+        caption.Opt('Background222224')
         this.reportWeek := this.Label(page, 731, 220, 360, '', 22, 'FFFFFF', 700, 40)
+        this.reportWeek.Opt('Background222224')
         this.reportProgress := this.Add(page, 'Progress', 'x298 y299 w832 h8 c8870FF Background303034', 0)
         this.reportHint := this.Label(page, 298, 320, 810, '', 9, 'A9A9B3')
-        this.Button(page, 298, 362, 180, '+ Принят репорт', this.ChangeReports.Bind(this, 1), true)
-        this.Button(page, 490, 362, 120, '− Убрать 1', this.ChangeReports.Bind(this, -1))
-        this.Button(page, 622, 362, 150, 'Обнулить день', this.ResetReports.Bind(this))
-        this.Label(page, 816, 350, 300, 'Дневная норма', 9, 'B8B8C0')
-        this.normField := this.Add(page, 'Edit', 'x816 y377 w110 h30 Number', this.norm)
-        this.Button(page, 940, 373, 190, 'Сохранить норму', this.SaveNorm.Bind(this), false, 34)
+        this.Button(page, 298, 373, 180, '+ Принят репорт', this.ChangeReports.Bind(this, 1), true, 36)
+        this.Button(page, 490, 373, 120, '− Убрать 1', this.ChangeReports.Bind(this, -1), false, 36)
+        this.Button(page, 622, 373, 150, 'Обнулить день', this.ResetReports.Bind(this), false, 36)
+        this.Label(page, 816, 346, 300, 'Дневная норма', 9, 'B8B8C0')
+        this.normField := this.Add(page, 'Edit', 'x816 y373 w110 h36 Number', this.norm)
+        this.Button(page, 940, 373, 190, 'Сохранить норму', this.SaveNorm.Bind(this), false, 36)
         this.Label(page, 298, 438, 800, 'История за последние 14 дней', 11, , 600)
-        this.reportHistory := this.Add(page, 'ListView', 'x298 y475 w832 h174 -Multi', ['Дата', 'Репорты'])
+        this.historyTiles := []
+        loop 14 {
+            index := A_Index - 1
+            x := 298 + Mod(index, 7) * 120
+            y := 475 + (index // 7) * 86
+            tile := this.Card(page, x, y, 108, 74, index = 0 ? '292338' : '222224')
+            date := this.Label(page, x + 12, y + 10, 84, '', 9, 'A8A8B5')
+            count := this.Label(page, x + 12, y + 34, 84, '', 16, index = 0 ? 'B6A2FF' : 'EEEEF2', 600, 30)
+            date.Opt('Background' (index = 0 ? '292338' : '222224'))
+            count.Opt('Background' (index = 0 ? '292338' : '222224'))
+            this.historyTiles.Push({date: date, count: count, panel: tile})
+        }
         this.Label(page, 298, 675, 820, '{rep} учитывается локально при отправке шаблона. Данные сервера не считываются.', 9, '8F8F9B')
     }
 
@@ -270,11 +339,11 @@ class BinderView extends BinderFeatures {
             Theme.Select(button, label = name)
         subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
             'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
-            'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля')
+            'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
+            'Change Log', 'История обновлений Hatiksu Binder')
         this.pageTitle.Text := name
         this.pageSubtitle.Text := subtitles[name]
-        if name = 'Оверлеи'
-            this.customEmpty.Visible := this.customOverlays.Length = 0
+        this.EmptyStates()
         if name = 'Репорты' || name = 'Основное'
             this.UpdateStats()
         if name = 'Настройки' {
@@ -296,15 +365,40 @@ class BinderView extends BinderFeatures {
             this.rows.Push(item)
             this.list.Add(, item.key, item.text, item.category)
         }
-        this.list.ModifyCol(1, 130)
-        this.list.ModifyCol(2, 490)
-        this.list.ModifyCol(3, 190)
+        this.Columns(this.list, [140, 480, 192])
         this.bindList.Delete()
         for item in this.binds
-            this.bindList.Add(, item.key, item.text)
-        this.bindList.ModifyCol(1, 160)
-        this.bindList.ModifyCol(2, 650)
+            this.bindList.Add(, KeyLabel(item.key), item.text)
+        this.Columns(this.bindList, [220, 592])
         this.count.Text := 'Показано: ' this.rows.Length ' из ' this.config.entries.Length '    •    Набор: ' (this.gender = 'male' ? 'мужской' : 'женский') '    •    Замечаний: ' this.config.problems.Length
         this.UpdateStats()
+        this.EmptyStates()
+    }
+
+    EmptyStates() {
+        name := this.currentPage
+        this.TableVisible(this.list, name = 'Триггеры' && this.rows.Length > 0)
+        this.triggerEmpty.Visible := name = 'Триггеры' && this.rows.Length = 0
+        empty := name = 'Бинды клавиш' && this.binds.Length = 0
+        this.TableVisible(this.bindList, name = 'Бинды клавиш' && !empty)
+        for c in [this.bindEmptyPanel, this.bindEmptyIcon, this.bindEmptyTitle, this.bindEmptyHint]
+            c.Visible := empty
+        empty := name = 'Оверлеи' && this.customOverlays.Length = 0
+        this.TableVisible(this.customList, name = 'Оверлеи' && !empty)
+        this.customEmptyPanel.Visible := empty
+        this.customEmpty.Visible := empty
+        for button in this.overlayActions
+            button.Visible := name = 'Оверлеи' && !empty
+    }
+
+    BuildChangelog() {
+        page := 'Change Log'
+        this.Card(page, 272, 102, 884, 611)
+        this.Button(page, 298, 125, 144, '← На главную', (*) => this.ShowPage('Основное'))
+        this.Label(page, 298, 196, 800, '0.3.0', 23, 'AD9BFF', 700, 40)
+        this.Label(page, 298, 244, 800, '18 ноября 2026  ·  Интерфейс и удобство', 10, '9999A8')
+        this.Label(page, 298, 290, 796, '• Тёмные списки с аккуратными заголовками и свободными строками.`n• Новые пустые состояния биндов и оверлеев — без сеток и полос.`n• Назначение клавиш в стиле приложения и понятные названия сочетаний.`n• Отдельная страница Change Log и кнопка Discord на главной.`n• Удалены пауза и переключатель: биндер работает вместе со скриптом.', 11, 'D0D0DA', , 150)
+        this.Label(page, 298, 478, 800, '0.2.0', 18, 'EEEEF2', 700, 32)
+        this.Label(page, 298, 523, 796, 'Профили, мужской и женский наборы, выбор фракции и /esp.`nСчётчик репортов, дневная норма, история и кастомные оверлеи.`nИмпорт, экспорт и категории триггеров.', 11, 'A9A9B7', , 100)
     }
 }

@@ -13,6 +13,7 @@ SendMode 'Event'
 SetKeyDelay 25, 25
 
 #Include lib\Theme.ahk
+#Include lib\Controls.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
@@ -22,12 +23,11 @@ class Binder extends BinderView {
         if this.gender != 'female'
             this.gender := 'male'
         this.process := IniRead(this.ini, 'General', 'Process', 'GTA5.exe')
-        this.enabled := true
         this.registered := []
         this.bound := []
         this.rows := []
         this.binds := []
-        this.context := (*) => this.enabled && WinActive('ahk_exe ' this.process)
+        this.context := (*) => WinActive('ahk_exe ' this.process)
         for gender in ['male', 'female'] {
             if !FileExist(this.dir '\' gender '.txt')
                 FileCopy A_ScriptDir '\configs\' gender '.txt', this.dir '\' gender '.txt'
@@ -35,9 +35,10 @@ class Binder extends BinderView {
         this.Load()
         this.Build()
         this.Activate()
-        Hotkey '^!F12', (*) => this.Toggle()
+        A_TrayMenu.Delete()
         A_TrayMenu.Add 'Открыть Hatiksu Binder', (*) => this.window.Show()
-        A_TrayMenu.Add 'Пауза / продолжить', (*) => this.Toggle()
+        A_TrayMenu.Add 'Завершить работу', (*) => ExitApp()
+        A_TrayMenu.Default := 'Открыть Hatiksu Binder'
         this.RenderOverlays()
         OnExit((*) => this.SaveOverlayPositions())
         if !(A_Args.Length && A_Args[1] = '--check')
@@ -121,8 +122,12 @@ class Binder extends BinderView {
         Theme.Window(d)
         d.MarginX := 24, d.MarginY := 24
         d.AddText('w650', isBind ? 'Нажми сочетание клавиш' : 'Триггер (например /ltk или .ключ)')
-        k := d.Add(isBind ? 'Hotkey' : 'Edit', 'w650 h32' (isBind ? '' : ' Background252527 cEEEEF2'), key)
-        Theme.Dark(k)
+        if isBind
+            k := KeyPicker(d, 'w650 h40', key)
+        else {
+            k := d.AddEdit('w650 h36 Background252527 cEEEEF2 -Multi -VScroll', key)
+            Theme.Dark(k)
+        }
         d.AddText('w650', 'Текст и действия: {enter}, {tab}, {esc}')
         t := d.AddEdit('w650 r8 Background252527 cEEEEF2', text)
         Theme.Dark(t)
@@ -235,10 +240,6 @@ class Binder extends BinderView {
     }
 
     StoreBind(index, key, text) {
-        if key = '^!F12' {
-            MsgBox 'Это сочетание зарезервировано для паузы.'
-            return false
-        }
         for n, item in this.binds {
             if n != index && item.key = key {
                 MsgBox 'Это сочетание уже занято.'
@@ -364,10 +365,6 @@ class Binder extends BinderView {
         }
     }
 
-    Toggle() {
-        this.enabled := !this.enabled
-        this.state.Text := this.enabled ? '● Биндер включён' : '○ Биндер на паузе'
-    }
 }
 
 RunChecks() {
@@ -409,6 +406,24 @@ RunChecks() {
         if app.currentPage != name
             throw Error('Не работает кнопка раздела: ' name)
     }
+    CheckClickText(app, 'Основное', '▤  Change Log')
+    if app.currentPage != 'Change Log'
+        throw Error('Не работает страница Change Log')
+    CheckClickText(app, 'Change Log', '← На главную')
+    for list in [app.list, app.bindList, app.customList] {
+        if SendMessage(0x1037, 0, 0, list) & 1
+            throw Error('В списке осталась сетка')
+        style := DllCall('GetWindowLongPtr', 'ptr', list.Hwnd, 'int', -16, 'ptr')
+        if !(style & 0x4000)
+            throw Error('В списке остался системный заголовок')
+    }
+    app.search.Value := ''
+    app.category.Select(2)
+    for row in app.rows {
+        if row.category != app.category.Text
+            throw Error('Не работает фильтр категорий')
+    }
+    app.category.Select(1)
     for faction in ['LSPD', 'FIB', 'SANG', 'LSCSD', 'Все'] {
         CheckClick(app.factionButtons[faction])
         if app.faction != faction
@@ -425,7 +440,13 @@ RunChecks() {
         throw Error('Не работает выбор /esp')
     app.ShowPage('Бинды клавиш')
     CheckClickText(app, 'Бинды клавиш', '+ Добавить бинд')
+    app.editorFields.key.Capture()
+    SendMessage 0x100, 0x78, 0, app.editorFields.key.control
+    if !RegExMatch(app.editorFields.key.Value, 'F9$') || app.editorFields.key.active
+        throw Error('Не работает запись клавиши F9')
     app.editorFields.key.Value := '^!F10'
+    if app.editorFields.key.control.Text != 'Ctrl + Alt + F10'
+        throw Error('Неправильное отображение сочетания клавиш')
     app.editorFields.body.Value := 'Проверка.{enter}'
     CheckClick(app.editorFields.save)
     app.Load()
@@ -444,6 +465,8 @@ RunChecks() {
     CheckClickText(app, 'Репорты', '+ Принят репорт')
     if app.ReportCounts().day != 1
         throw Error('Не работает счётчик репортов')
+    if app.historyTiles.Length != 14 || app.historyTiles[1].count.Text != '1'
+        throw Error('Не обновляется история репортов')
     CheckClickText(app, 'Репорты', '− Убрать 1')
     if app.ReportCounts().day != 0
         throw Error('Не работает коррекция счётчика')
@@ -482,7 +505,7 @@ RunChecks() {
         if DllCall('IsWindow', 'ptr', hwnd)
             SendMessage 0xF, 0, 0, hwnd
     }
-    FileAppend 'OK: native button events, 6 pages, factions, gender, ESP, bind and trigger persistence, reports, overlays, settings`n', '*'
+    FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp
 }
 

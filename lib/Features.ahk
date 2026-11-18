@@ -162,14 +162,13 @@ class BinderFeatures {
         this.reportWeek.Text := stats.week
         this.reportProgress.Value := Min(100, Round(stats.day / this.norm * 100))
         this.reportHint.Text := 'Выполнено ' Round(stats.day / this.norm * 100) '% дневной нормы'
-        this.reportHistory.Delete()
         loop 14 {
             date := DateAdd(A_Now, -(A_Index - 1), 'Days')
             key := FormatTime(date, 'yyyyMMdd')
-            this.reportHistory.Add(, FormatTime(date, 'dd.MM.yyyy'), IniRead(this.reportIni, 'Daily', key, '0'))
+            tile := this.historyTiles[A_Index]
+            tile.date.Text := A_Index = 1 ? 'Сегодня' : FormatTime(date, 'dd.MM')
+            tile.count.Text := IniRead(this.reportIni, 'Daily', key, '0')
         }
-        this.reportHistory.ModifyCol(1, 220)
-        this.reportHistory.ModifyCol(2, 180)
     }
 
     Notify(message) {
@@ -297,12 +296,9 @@ class BinderFeatures {
     RefreshOverlayList() {
         this.customList.Delete()
         for item in this.customOverlays
-            this.customList.Add(, item.enabled ? '●' : '○', item.name, item.key = '' ? '—' : item.key, item.image = '' ? 'Текст' : 'Картинка + текст')
-        this.customList.ModifyCol(1, 40)
-        this.customList.ModifyCol(2, 330)
-        this.customList.ModifyCol(3, 170)
-        this.customList.ModifyCol(4, 220)
-        this.customEmpty.Visible := this.customOverlays.Length = 0 && this.currentPage = 'Оверлеи'
+            this.customList.Add(, item.enabled ? '●' : '○', item.name, item.key = '' ? '—' : KeyLabel(item.key), item.image = '' ? 'Текст' : 'Картинка + текст')
+        this.Columns(this.customList, [40, 330, 200, 242])
+        this.EmptyStates()
         this.BindOverlayKeys()
     }
 
@@ -347,8 +343,7 @@ class BinderFeatures {
         picture := d.AddEdit('w450 Background252527 cEEEEF2', item.image)
         Theme.Button(d, 'x+10 w140 h30', 'Выбрать…').OnEvent('Click', Browse)
         d.AddText('xm y+20 w600', 'Клавиши показа / скрытия в игре (необязательно)')
-        key := d.AddHotkey('w300 h30', item.key)
-        Theme.Dark(key)
+        key := KeyPicker(d, 'w600 h40', item.key)
         saveButton := Theme.Button(d, 'xm y+25 w180 h38 Default', 'Сохранить', '765DFF')
         saveButton.OnEvent('Click', Commit)
         this.overlayEditor := {gui: d, title: title, body: body, image: picture, key: key, save: saveButton}
@@ -365,10 +360,6 @@ class BinderFeatures {
             }
             if picture.Value != '' && !FileExist(picture.Value) {
                 MsgBox 'Изображение не найдено.'
-                return
-            }
-            if key.Value = '^!F12' {
-                MsgBox 'Сочетание занято паузой.'
                 return
             }
             for binding in this.binds {
@@ -408,7 +399,7 @@ class BinderFeatures {
     }
 
     Guide(*) {
-        text := '1. Выбери или создай профиль слева сверху.`n`n2. На главной выбери пол, фракцию и тип /esp. Discord-поля сохраняются сразу.`n`n3. В «Триггерах» доступен поиск, категории, импорт и экспорт. В открытом чате введи сокращение, затем пробел.`n`n4. В «Биндах клавиш» назначь сочетание и текст. Бинд открывает чат клавишей T.`n`n5. В «Оверлеях» включи счётчик и создай свои плашки. Кнопка «Переместить» позволяет перетаскивать их; «Готово» сохраняет положение.`n`n6. {rep} в конце успешно отправленного шаблона увеличивает локальный счётчик репортов. Счётчик не читает данные сервера; его можно поправить вручную.`n`nCtrl+Alt+F12 — пауза. Оверлеи работают поверх оконного режима игры и режима без рамки.'
+        text := '1. Выбери или создай профиль слева сверху.`n`n2. На главной выбери пол, фракцию и тип /esp. Discord-поля сохраняются сразу.`n`n3. В «Триггерах» доступен поиск, категории, импорт и экспорт. В открытом чате введи сокращение, затем пробел.`n`n4. В «Биндах клавиш» нажми поле клавиш и введи сочетание. Esc отменяет запись, Backspace очищает поле. Бинд открывает чат клавишей T.`n`n5. В «Оверлеях» включи счётчик и создай свои плашки. Кнопка «Переместить» позволяет перетаскивать их; «Готово» сохраняет положение.`n`n6. {rep} в конце успешно отправленного шаблона увеличивает локальный счётчик репортов. Счётчик не читает данные сервера; его можно поправить вручную.`n`nБиндер работает, пока запущен скрипт. Оверлеи работают поверх оконного режима игры и режима без рамки.'
         d := Gui('+Owner' this.window.Hwnd, 'Как пользоваться Hatiksu Binder')
         Theme.Window(d)
         d.MarginX := 24, d.MarginY := 24
@@ -418,7 +409,7 @@ class BinderFeatures {
     }
 
     Changelog(*) {
-        MsgBox 'Hatiksu Binder 0.2`n`n• Тёмный интерфейс по референсу`n• Профили, пол, фракция и /esp`n• Счётчик репортов и дневная норма`n• Оверлеи: текст, изображения, горячие клавиши`n• История за 14 дней`n• Импорт, экспорт и категории триггеров`n• Действия {left N}, {space} и {rep}', 'Что нового'
+        this.ShowPage('Change Log')
     }
 
     DailyRefresh() {
