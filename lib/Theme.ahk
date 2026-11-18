@@ -113,6 +113,10 @@ class Theme {
         state := item.panel ? 0 : DllCall('SendMessageW', 'ptr', hwnd, 'uint', 0xF2, 'uptr', 0, 'ptr', 0, 'ptr')
         fill := item.selected ? '302848' : item.color
         edge := item.selected ? '8870FF' : (item.panel ? '343436' : '424245')
+        if item.HasOwnProp('inputFrame') {
+            fill := item.color
+            edge := item.selected ? '9B85FF' : '45454F'
+        }
         if item.nav {
             fill := item.selected ? '161618' : item.color
             edge := fill

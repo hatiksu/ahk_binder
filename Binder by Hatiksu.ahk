@@ -31,7 +31,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.6.1'
+        this.version := '0.7.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -42,6 +42,11 @@ class Binder extends BinderView {
         this.rows := []
         this.binds := []
         this.context := (*) => WinActive('ahk_exe ' this.process)
+        this.testChatHwnd := 0
+        this.testInputHwnd := 0
+        this.triggerContext := this.TriggerAllowed.Bind(this)
+        this.testKeyHandler := this.TestKeyDown.Bind(this)
+        OnMessage(0x100, this.testKeyHandler)
         for gender in ['male', 'female'] {
             if !FileExist(this.dir '\' gender '.txt')
                 FileCopy A_ScriptDir '\configs\' gender '.txt', this.dir '\' gender '.txt'
@@ -57,7 +62,7 @@ class Binder extends BinderView {
         A_TrayMenu.Add 'Завершить работу', (*) => ExitApp()
         A_TrayMenu.Default := 'Открыть Binder by Hatiksu'
         this.RenderOverlays()
-        OnExit((*) => this.SaveOverlayPositions())
+        OnExit(this.PersistPreferences.Bind(this))
         if !(A_Args.Length && A_Args[1] = '--check')
             SetTimer this.DailyRefresh.Bind(this), 60000
     }
@@ -314,12 +319,10 @@ class Binder extends BinderView {
     }
 
     Activate() {
-        HotIf this.context
+        HotIf this.triggerContext
         for name in this.registered
             Hotstring name, , 'Off'
-        for key in this.bound
-            Hotkey key, 'Off'
-        this.registered := [], this.bound := [], failures := []
+        this.registered := [], failures := []
         for item in this.config.entries {
             ; Only matching options are used; bodies are always data, never AHK code.
             options := '?XO'
@@ -332,6 +335,10 @@ class Binder extends BinderView {
             } catch as err
                 failures.Push(item.key ': ' err.Message)
         }
+        HotIf this.context
+        for key in this.bound
+            Hotkey key, 'Off'
+        this.bound := []
         for item in this.binds {
             try {
                 Hotkey item.key, this.Emit.Bind(this, item.text, true), 'On'
@@ -344,12 +351,49 @@ class Binder extends BinderView {
         this.BindOverlayKeys()
     }
 
-    Emit(text, openChat, *) {
-        if !this.context()
-            return
+    TriggerAllowed(*) {
+        active := WinExist('A')
+        if !active
+            return false
+        if active = this.testChatHwnd
+            return true
+        if A_Args.Length && (A_Args[1] = '--check' || A_Args[1] = '--ui-test')
+            return false
+        return WinGetPID('ahk_id ' active) != DllCall('GetCurrentProcessId', 'uint')
+    }
+
+    BuildActions(text) {
         for name, field in this.variables
             text := StrReplace(text, '%' name '%', field.Value)
         text := this.PrepareCommands(text)
+        actions := [], pos := 1
+        while RegExMatch(text, '\{([^{}]+)\}', &match, pos) {
+            literal := SubStr(text, pos, match.Pos - pos)
+            if literal != ''
+                actions.Push({type: 'text', value: literal})
+            token := StrLower(match[1])
+            if token = 'rep' {
+                if !actions.Length || actions[-1].type != 'key' || actions[-1].value != 'Enter'
+                    actions.Push({type: 'key', value: 'Enter'})
+            } else if token = 'enter' || token = 'tab' || token = 'esc'
+                actions.Push({type: 'key', value: token = 'enter' ? 'Enter' : token})
+            else if RegExMatch(token, '^(left|right|space)(?: (\d{1,3}))?$', &action) {
+                count := action[2] = '' ? 1 : Min(100, Integer(action[2]))
+                actions.Push({type: 'key', value: action[1] ' ' count})
+            } else if token = '!'
+                actions.Push({type: 'text', value: '!'})
+            pos := match.Pos + match.Len
+        }
+        if pos <= StrLen(text)
+            actions.Push({type: 'text', value: SubStr(text, pos)})
+        return actions
+    }
+
+    Emit(text, openChat, *) {
+        if !(openChat ? this.context() : this.triggerContext())
+            return
+        target := WinExist('A')
+        actions := this.BuildActions(text)
         if openChat {
             for modifier in ['Ctrl', 'Alt', 'Shift', 'LWin', 'RWin']
                 KeyWait modifier
@@ -358,28 +402,94 @@ class Binder extends BinderView {
             SendEvent 't'
             Sleep 180
         }
-        pos := 1, pendingReport := false
-        while RegExMatch(text, '\{([^{}]+)\}', &m, pos) {
-            if !this.context()
+        for action in actions {
+            if WinExist('A') != target
                 return
-            SendText SubStr(text, pos, m.Pos - pos)
-            token := StrLower(m[1])
-            if token = 'enter' || token = 'tab' || token = 'esc' {
-                SendEvent '{' token '}'
-                Sleep 100
-            } else if RegExMatch(token, '^(left|right|space)(?: (\d{1,3}))?$', &action) {
-                count := action[2] = '' ? 1 : Min(100, Integer(action[2]))
-                SendEvent '{' action[1] ' ' count '}'
-            } else if token = '!'
-                SendText '!'
-            else if token = 'rep'
-                pendingReport := true
-            pos := m.Pos + m.Len
+            if target = this.testChatHwnd {
+                this.ApplyTestAction(action)
+                continue
+            }
+            if action.type = 'text' {
+                if this.context()
+                    SendText action.value
+                else
+                    SendInput '{Text}' action.value
+            } else {
+                SendEvent '{' action.value '}'
+                Sleep 60
+            }
         }
-        if this.context() {
-            SendText SubStr(text, pos)
-            if pendingReport
-                this.ChangeReports(1)
+    }
+
+    OpenTriggerTest(*) {
+        if this.testChatHwnd && DllCall('IsWindow', 'ptr', this.testChatHwnd) {
+            this.testChat.Show()
+            return
+        }
+        g := DarkDialog.Window('Проверка триггеров', 780, this.CloseTriggerTest.Bind(this))
+        this.testChat := g
+        this.testChatHwnd := g.Hwnd
+        g.AddText('x24 y78 w732 h54 cB0B0BD', 'Введи .ку и нажми пробел. Сообщение появится в журнале ниже.`nЭто локальная проверка: текст никуда не отправляется.')
+        this.testInput := g.AddEdit('x24 y150 w732 h40 Background171719 cEEEEF2 -Multi -VScroll')
+        Theme.SingleLine(this.testInput)
+        this.testInputHwnd := this.testInput.Hwnd
+        this.testStatus := g.AddText('x24 y210 w732 h26 cA695EC', 'Отправлено сообщений: 0')
+        this.testOutput := g.AddEdit('x24 y251 w732 h164 ReadOnly Background171719 cEEEEF2')
+        Theme.Dark(this.testOutput)
+        this.testMessages := []
+        Theme.Button(g, 'x24 y438 w180 h38', 'Очистить').OnEvent('Click', (*) => this.ClearTriggerTest())
+        g.Show('w780 h502' (A_Args.Length && A_Args[1] = '--check' ? ' Hide' : ''))
+        this.testInput.Focus()
+    }
+
+    CloseTriggerTest(*) {
+        this.testChatHwnd := 0
+        this.testInputHwnd := 0
+    }
+
+    ClearTriggerTest() {
+        this.testMessages := []
+        this.testInput.Value := ''
+        this.testOutput.Value := ''
+        this.testStatus.Text := 'Отправлено сообщений: 0'
+    }
+
+    ApplyTestAction(action) {
+        if action.type = 'text'
+            SendMessage 0xC2, true, StrPtr(action.value), this.testInput
+        else if action.value = 'Enter'
+            this.RecordTestMessage()
+        else if RegExMatch(action.value, '^(left|right|space) (\d+)$', &movement) {
+            count := Integer(movement[2])
+            if movement[1] = 'space' {
+                spaces := ''
+                loop count
+                    spaces .= ' '
+                SendMessage 0xC2, true, StrPtr(spaces), this.testInput
+            } else {
+                start := Buffer(4), finish := Buffer(4)
+                SendMessage 0xB0, start.Ptr, finish.Ptr, this.testInput
+                position := movement[1] = 'left' ? Max(0, NumGet(start, 0, 'uint') - count) : Min(StrLen(this.testInput.Value), NumGet(finish, 0, 'uint') + count)
+                SendMessage 0xB1, position, position, this.testInput
+            }
+        } else if action.value = 'esc'
+            this.testInput.Value := ''
+    }
+
+    RecordTestMessage() {
+        value := this.testInput.Value
+        if value = ''
+            return
+        this.testMessages.Push(value)
+        this.testOutput.Value := this.Join(this.testMessages)
+        this.testInput.Value := ''
+        this.testStatus.Text := 'Отправлено сообщений: ' this.testMessages.Length
+    }
+
+    TestKeyDown(key, lp, msg, hwnd) {
+        if key = 13 && hwnd = this.testInputHwnd {
+            this.RecordTestMessage()
+            return 0
         }
     }
 
@@ -488,7 +598,7 @@ RunChecks() {
     }
     for extra in ['GOV', 'EMS', 'WN'] {
         app.SetFaction(extra)
-        if app.factionButtons['Все'].Text != extra || !Theme.items[app.factionButtons['Все'].Hwnd].selected || IniRead(app.ini, 'General', 'Faction') != extra
+        if app.factionButtons['Все'].Text != 'Все' || Theme.items[app.factionButtons['Все'].Hwnd].selected || IniRead(app.ini, 'General', 'Faction') != extra
             throw Error('Не работает дополнительная фракция ' extra)
     }
     SetTimer(ChooseEMS, -100)
@@ -642,6 +752,35 @@ RunChecks() {
     Sleep 220
     if app.rows.Length != 1 || app.rows[1].key != '/hatiksu_test'
         throw Error('Не работает отложенный поиск')
+    app.SetFaction('WN')
+    app.SetESP(2)
+    for name, value in Map('dis', '@мой_дискорд', 'gadis', '@главный', 'zgadis', '@заместитель') {
+        app.variables[name].Value := value
+        app.SaveVariable(name, app.variables[name])
+    }
+    app.PersistPreferences()
+    loaded := {}
+    ObjSetBase(loaded, Binder.Prototype)
+    loaded.InitProfile()
+    if loaded.faction != 'WN' || loaded.esp != '2'
+        throw Error('Фракция или ESP не восстановились из сохранённого профиля')
+    for name, field in app.variables {
+        if IniRead(loaded.ini, 'Variables', name) != field.Value
+            throw Error('Не сохранилось Discord-поле ' name)
+    }
+    first := app.BuildActions('Приветствую.{enter}{rep}')
+    second := app.BuildActions('Здравствуйте.{rep}')
+    if first.Length != 2 || first[2].value != 'Enter' || second.Length != 2 || second[2].value != 'Enter'
+        throw Error('Маркер rep должен отправлять один Enter')
+    app.OpenTriggerTest()
+    countBefore := app.ReportCounts().day
+    for action in first
+        app.ApplyTestAction(action)
+    if app.testMessages.Length != 1 || app.testMessages[1] != 'Приветствую.' || app.ReportCounts().day != countBefore
+        throw Error('Проверка триггера отправляет текст неверно или меняет счётчик')
+    app.testChat.Destroy()
+    app.CloseTriggerTest()
+    FileAppend 'OK: saved faction, ESP and Discord fields; rep sends once; local trigger test does not change report counts`n', '*'
     FileAppend 'OK: complete version history, guide layout, wheel and scrollbar, cached stats, stable overlays, debounced search`n', '*'
     FileAppend 'OK: legacy norm migration, weekday/weekend boundaries, single-line inputs, dark dialogs, confirmations, file picker`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'

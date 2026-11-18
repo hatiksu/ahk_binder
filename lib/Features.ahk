@@ -95,8 +95,8 @@ class BinderFeatures {
         this.faction := name
         IniWrite name, this.ini, 'General', 'Faction'
         for label, button in this.factionButtons
-            Theme.Select(button, label = name || (label = 'Все' && this.IsExtraFaction(name)))
-        this.factionButtons['Все'].Text := this.IsExtraFaction(name) ? name : 'Все'
+            Theme.Select(button, label != 'Все' && label = name)
+        this.factionButtons['Все'].Text := 'Все'
         this.factionId.Value := IniRead(this.ini, 'FactionIDs', name, '')
         this.factionLabel.Text := 'Для выбранной фракции: ' name
     }
@@ -134,6 +134,15 @@ class BinderFeatures {
     SaveVariable(name, field, *) {
         IniWrite field.Value, this.ini, 'Variables', name
         this.UpdateOverlayText()
+    }
+
+    PersistPreferences(*) {
+        IniWrite this.faction, this.ini, 'General', 'Faction'
+        IniWrite this.esp, this.ini, 'General', 'ESP'
+        IniWrite this.gender, this.ini, 'General', 'Gender'
+        for name, field in this.variables
+            IniWrite field.Value, this.ini, 'Variables', name
+        this.SaveOverlayPositions()
     }
 
     ReportCounts(now := '') {

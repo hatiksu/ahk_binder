@@ -36,14 +36,19 @@ class DarkDialog {
         }
     }
 
-    static Window(title, width := 700) {
+    static Window(title, width := 700, onClose := 0) {
         frame := this.Frame(title, width)
-        frame.close.OnEvent('Click', (*) => frame.gui.Destroy())
-        frame.gui.OnEvent('Close', (*) => frame.gui.Destroy())
-        frame.gui.OnEvent('Escape', (*) => frame.gui.Destroy())
+        frame.close.OnEvent('Click', Close)
+        frame.gui.OnEvent('Close', Close)
+        frame.gui.OnEvent('Escape', Close)
         ; Явная точка начала содержимого, чтобы оно не наследовало X кнопки закрытия.
         frame.gui.AddText('x24 y56 w1 h1 Hidden', '')
         return frame.gui
+        Close(*) {
+            if IsObject(onClose)
+                onClose.Call()
+            frame.gui.Destroy()
+        }
     }
 
     static Message(text, title := 'Binder by Hatiksu', options := 'OK') {
