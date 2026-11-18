@@ -26,12 +26,14 @@ SetKeyDelay 25, 25
 #Include lib\Controls.ahk
 #Include lib\Dialogs.ahk
 #Include lib\ScrollPage.ahk
+#Include lib\ReportCounter.ahk
+#Include lib\ReportDetector.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.7.2'
+        this.version := '0.8.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -64,7 +66,10 @@ class Binder extends BinderView {
         this.RenderOverlays()
         OnExit(this.PersistPreferences.Bind(this))
         if !(A_Args.Length && A_Args[1] = '--check')
+        {
             SetTimer this.DailyRefresh.Bind(this), 60000
+            this.reportWatcher := ReportCounter(this)
+        }
     }
 
     Parse(text) {
@@ -812,6 +817,39 @@ RunChecks() {
     FileAppend 'OK: saved faction, ESP and Discord fields; rep sends once; local trigger test does not change report counts`n', '*'
     FileAppend 'OK: complete version history, guide layout, wheel and scrollbar, cached stats, stable overlays, debounced search`n', '*'
     FileAppend 'OK: legacy norm migration, weekday/weekend boundaries, single-line inputs, dark dialogs, confirmations, file picker`n', '*'
+    detector := ReportDetector()
+    box := {x: 100, y: 100, w: 160, h: 40}
+    detector.Observe('23267105', false, box, 1000)
+    detector.Observe('23267105', false, box, 1300)
+    detector.Click(150, 120, 1400)
+    if detector.Observe('', false, 0, 1600) != ''
+        throw Error('Потеря распознавания засчитана как закрытие')
+    if detector.Observe('', true, 0, 1900) != '' || detector.Observe('', true, 0, 2200) != '23267105'
+        throw Error('Подтверждённое закрытие не распознано')
+    if detector.Observe('', true, 0, 2500) != ''
+        throw Error('Повторное подтверждение прибавило репорт')
+    detector.Observe('23267140', false, box, 3000)
+    detector.Observe('23267140', false, box, 3300)
+    detector.Click(150, 120, 3400)
+    detector.Observe('23267105', false, box, 3500)
+    if detector.Observe('', true, 0, 3700) != '' || detector.Observe('', true, 0, 4000) != ''
+        throw Error('Переход к другому обращению засчитан как закрытие')
+    beforeAuto := app.ReportCounts().day
+    date := FormatTime(, 'yyyyMMddHHmmss')
+    if !ReportCounter.Accept(app, '23267105', date) || ReportCounter.Accept(app, '23267105', date)
+        throw Error('Не работает защита от повторного подсчёта')
+    app.ChangeReports(-1)
+    restored := {}
+    ObjSetBase(restored, Binder.Prototype)
+    restored.InitProfile()
+    if restored.ReportCounts().day != beforeAuto || !restored.autoClosed.Has('23267105')
+        throw Error('После перезапуска потерялась коррекция или защита от дублей')
+    SetTimer((*) => CheckClick(DarkDialog.last.buttons[1]), -100)
+    app.ResetReports()
+    restored.InitProfile()
+    if restored.ReportCounts().day != 0
+        throw Error('Автоматические репорты вернулись после обнуления')
+    FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and corrections`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp
     FillPrompt() {

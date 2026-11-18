@@ -23,11 +23,12 @@ class BinderFeatures {
         if FileExist(this.reportIni) {
             try {
                 for line in StrSplit(IniRead(this.reportIni, 'Daily'), '`n', '`r') {
-                    if RegExMatch(line, '^(\d{8})=(\d+)$', &record)
+                    if RegExMatch(line, '^(\d{8})=(-?\d+)$', &record)
                         this.reportDays[record[1]] := Integer(record[2])
                 }
             }
         }
+        ReportCounter.Load(this)
         this.lastDate := FormatTime(, 'yyyyMMdd')
         this.statsSignature := ''
         this.statsPaints := 0
@@ -163,7 +164,7 @@ class BinderFeatures {
         today := FormatTime(, 'yyyyMMdd')
         current := this.reportDays.Get(today, 0)
         next := Max(0, current + delta)
-        IniWrite next, this.reportIni, 'Daily', today
+        IniWrite next - this.autoDays.Get(today, 0), this.reportIni, 'Daily', today
         this.reportDays[today] := next
         this.UpdateStats()
         this.UpdateOverlayText()
@@ -198,7 +199,7 @@ class BinderFeatures {
 
     ResetReports(*) {
         if DarkDialog.Message('Обнулить счётчик за сегодня? История других дней сохранится.', 'Репорты', 'YesNo') = 'Yes' {
-            IniWrite 0, this.reportIni, 'Daily', FormatTime(, 'yyyyMMdd')
+            IniWrite -this.autoDays.Get(FormatTime(, 'yyyyMMdd'), 0), this.reportIni, 'Daily', FormatTime(, 'yyyyMMdd')
             this.reportDays[FormatTime(, 'yyyyMMdd')] := 0
             this.UpdateStats()
             this.UpdateOverlayText()

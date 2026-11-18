@@ -366,7 +366,7 @@ class BinderView extends BinderFeatures {
             count.Opt('Background' (index = 0 ? '292338' : '222224'))
             this.historyTiles.Push({date: date, count: count, panel: tile})
         }
-        this.Label(page, 298, 675, 820, 'Локальная статистика. Количество принятых репортов меняется кнопками выше.', 9, '8F8F9B')
+        this.autoReportStatus := this.Label(page, 298, 675, 820, 'Автоподсчёт: ожидаю игру', 9, '8F8F9B')
     }
 
     ShowPage(name, *) {
