@@ -18,10 +18,24 @@ if A_Args.Length && A_Args[1] = '--file' {
     ExitApp
 }
 parent := Integer(A_Args[1]), game := A_Args[2], output := A_Args[3]
+parentHandle := DllCall('OpenProcess', 'uint', 0x100000, 'int', false, 'uint', parent, 'ptr')
+if !parentHandle
+    ExitApp
+OnExit(CloseParent)
+CloseParent(*) {
+    DllCall('CloseHandle', 'ptr', parentHandle)
+    return 0
+}
+SetTimer CheckParent, 1000
+ProcessSetPriority 'BelowNormal'
+CheckParent(*) {
+    if DllCall('WaitForSingleObject', 'ptr', parentHandle, 'uint', 0, 'uint') != 0x102
+        ExitApp
+}
 detector := ReportDetector()
 CoordMode 'Mouse', 'Screen'
 targetHwnd := 0, targetPID := 0, lastTarget := 0
-HotIf (*) => targetHwnd && WinActive('ahk_id ' targetHwnd)
+HotIf (*) => targetHwnd && DllCall('GetForegroundWindow', 'ptr') = targetHwnd
 Hotkey '~LButton', RecordClick
 HotIf
 RecordClick(*) {
@@ -29,7 +43,7 @@ RecordClick(*) {
     detector.Click(x, y)
 }
 OCR.LoadLanguage('ru-RU')
-while ProcessExist(parent) {
+while DllCall('WaitForSingleObject', 'ptr', parentHandle, 'uint', 0, 'uint') = 0x102 {
     targetHwnd := Integer(IniRead(output, 'Target', 'Hwnd', '0'))
     targetPID := Integer(IniRead(output, 'Target', 'PID', '0'))
     if targetHwnd != lastTarget {
@@ -70,5 +84,4 @@ while ProcessExist(parent) {
     }
     Sleep detector.pending != '' ? 60 : 300
 }
-
-
+ExitApp

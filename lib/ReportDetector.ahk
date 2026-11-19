@@ -8,6 +8,12 @@ class ReportDetector {
     }
     Observe(id, empty, button := 0, now := A_TickCount) {
         if this.pending != '' {
+            if now - this.clicked <= 5000 && id != '' && id != this.pending && this.emptyFrames > 0 {
+                closed := this.pending
+                this.Reset()
+                this.id := id, this.button := button, this.stable := 1, this.seen := now
+                return closed
+            }
             if now - this.clicked > 5000 || (id != '' && id != this.pending) {
                 this.pending := ''
             } else if empty {

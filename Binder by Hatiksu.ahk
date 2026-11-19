@@ -36,7 +36,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.2'
+        this.version := '0.10.3'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -45,6 +45,7 @@ class Binder extends BinderView {
         this.gameWindow.Refresh()
         this.chatKey := IniRead(this.ini, 'Input', 'ChatKey', 't')
         this.chatDelay := Max(50, Min(2000, Integer(IniRead(this.ini, 'Input', 'ChatDelay', '180'))))
+        this.ownPID := DllCall('GetCurrentProcessId', 'uint')
         this.registered := []
         this.bound := []
         this.rows := []
@@ -374,14 +375,15 @@ class Binder extends BinderView {
     }
 
     TriggerAllowed(*) {
-        active := WinExist('A')
+        active := DllCall('GetForegroundWindow', 'ptr')
         if !active
             return false
         if active = this.testChatHwnd
             return true
         if A_Args.Length && (A_Args[1] = '--check' || A_Args[1] = '--ui-test')
             return false
-        return WinGetPID('ahk_id ' active) != DllCall('GetCurrentProcessId', 'uint')
+        DllCall('GetWindowThreadProcessId', 'ptr', active, 'uint*', &ownerPID := 0)
+        return ownerPID != 0 && ownerPID != this.ownPID
     }
 
     BuildActions(text) {
@@ -842,7 +844,7 @@ RunChecks() {
         throw Error('Возврат в раздел заново создал неизменившийся список')
     app.SetFaction('WN')
     app.SetESP(2)
-    for name, value in Map('dis', '@мой_дискорд', 'gadis', '@главный', 'zgadis', '@заместитель') {
+    for name, value in Map('dis', '@мой_дискорд', 'gadis', '@главный', 'zgadis', '@заместитель', 'chhdis', '@чифхелперов', 'chcrimedis', '@чифкрайма', 'chgosdis', '@чифгос') {
         app.variables[name].Value := value
         app.SaveVariable(name, app.variables[name])
     }
@@ -856,6 +858,9 @@ RunChecks() {
         if IniRead(loaded.ini, 'Variables', name) != field.Value
             throw Error('Не сохранилось Discord-поле ' name)
     }
+    chiefActions := app.BuildActions('%chhdis% %chcrimedis% %chgosdis%')
+    if chiefActions.Length != 1 || chiefActions[1].value != '@чифхелперов @чифкрайма @чифгос'
+        throw Error('Не подставляются Discord-поля чифов')
     first := app.BuildActions('Приветствую.{enter}{rep}')
     second := app.BuildActions('Здравствуйте.{rep}')
     if first.Length != 2 || first[2].value != 'Enter' || second.Length != 2 || second[2].value != 'Enter'
@@ -888,6 +893,14 @@ RunChecks() {
     detector.Observe('23267105', false, box, 3500)
     if detector.Observe('', true, 0, 3700) != '' || detector.Observe('', true, 0, 4000) != ''
         throw Error('Переход к другому обращению засчитан как закрытие')
+    detector.Reset()
+    detector.Observe('23342682', false, box, 5000)
+    detector.Observe('23342682', false, box, 5300)
+    detector.Click(150, 120, 5400)
+    if detector.Observe('', true, 0, 5500) != '' || detector.Observe('23342396', false, box, 5600) != '23342682'
+        throw Error('Быстрый переход потерял подтверждённое закрытие')
+    if detector.Observe('', true, 0, 5700) != ''
+        throw Error('Следующее обращение засчитано без клика')
     beforeAuto := app.ReportCounts().day
     date := FormatTime(, 'yyyyMMddHHmmss')
     if !ReportCounter.Accept(app, '23267105', date) || ReportCounter.Accept(app, '23267105', date)
@@ -901,6 +914,8 @@ RunChecks() {
     movingHUD := ReportOverlay(app, 40, 60)
     if movingHUD.gui.BackColor != '202023'
         throw Error('Не работает режим перемещения прозрачного оверлея')
+    if movingHUD.width > 244 || movingHUD.height > 48 || movingHUD.HasOwnProp('progress')
+        throw Error('Оверлей не стал компактным')
     movingHUD.gui.Destroy()
     app.overlayMoving := false
     FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and automatic totals`n', '*'

@@ -201,10 +201,11 @@ class BinderView extends BinderFeatures {
             Theme.Select(b, this.gender = pair[1])
         }
         this.variables := Map()
-        for i, name in ['dis', 'gadis', 'zgadis'] {
-            x := 298 + (i - 1) * 280
-            this.Label(page, x + 5, 554, 260, '%' name '%', 9, 'B8B8C0', 600)
-            field := this.RoundedInput(page, x, 581, 264, 40, IniRead(this.ini, 'Variables', name, ''))
+        for i, name in ['dis', 'gadis', 'zgadis', 'chhdis', 'chcrimedis', 'chgosdis'] {
+            x := 298 + Mod(i - 1, 3) * 280
+            y := i <= 3 ? 554 : 634
+            this.Label(page, x + 5, y, 260, '%' name '%', 9, 'B8B8C0', 600)
+            field := this.RoundedInput(page, x, y + 27, 264, 40, IniRead(this.ini, 'Variables', name, ''))
             field.OnEvent('Change', this.SaveVariable.Bind(this, name))
             this.variables[name] := field
         }

@@ -29,7 +29,18 @@ class ReportCounter {
         this.path := app.rootDir '\report-watch-' DllCall('GetCurrentProcessId', 'uint') '-' A_TickCount '.ini'
         this.callback := this.Poll.Bind(this)
         this.game := ''
+        this.lastStamp := 0
+        OnExit(this.Shutdown.Bind(this))
         SetTimer this.callback, 700
+    }
+    Shutdown(*) {
+        SetTimer this.callback, 0
+        if this.HasOwnProp('workerHandle') && this.workerHandle {
+            if DllCall('WaitForSingleObject', 'ptr', this.workerHandle, 'uint', 0, 'uint') = 0x102
+                DllCall('TerminateProcess', 'ptr', this.workerHandle, 'uint', 0)
+            DllCall('CloseHandle', 'ptr', this.workerHandle)
+            this.workerHandle := 0
+        }
     }
     Poll() {
         app := this.app
@@ -43,8 +54,13 @@ class ReportCounter {
         if !this.HasOwnProp('pid') {
             Run '"' A_AhkPath '" /ErrorStdOut "' A_ScriptDir '\lib\ReportWorker.ahk" ' DllCall('GetCurrentProcessId', 'uint') ' 0 "' this.path '"', , 'Hide', &pid
             this.pid := pid
+            this.workerHandle := DllCall('OpenProcess', 'uint', 0x100001, 'int', false, 'uint', pid, 'ptr')
         }
-        if !FileExist(this.path)
+        attributes := Buffer(36, 0)
+        if !DllCall('GetFileAttributesExW', 'str', this.path, 'int', 0, 'ptr', attributes)
+            return
+        stamp := NumGet(attributes, 20, 'int64')
+        if stamp = this.lastStamp
             return
         try {
             text := IniRead(this.path, 'State', 'Status', 'Автоподсчёт: запуск распознавания')
@@ -54,6 +70,7 @@ class ReportCounter {
                 if RegExMatch(line, '^(\d{6,12})=(\d{14})$', &m)
                     ReportCounter.Accept(app, m[1], m[2])
             }
+            this.lastStamp := stamp
         }
     }
 }

@@ -6,18 +6,10 @@ class ReportOverlay {
         g.BackColor := '010203'
         g.MarginX := 0, g.MarginY := 0
         compact := app.overlayStyle = 'compact'
-        this.width := compact ? 356 : 292
-        this.height := compact ? 88 : 144
-        g.AddText('x0 y6 w3 h48 BackgroundA78BFA', '')
-        this.Label(14, 4, 200, 'РЕПОРТЫ / СЕГОДНЯ', 8, 'D8C9FF')
-        this.day := this.Label(14, 22, 190, '', 23, 'FFFFFF', 40)
-        weekX := compact ? 234 : 14
-        weekY := compact ? 4 : 69
-        this.Label(weekX, weekY, 116, 'ЗА НЕДЕЛЮ', 8, 'D8C9FF')
-        this.week := this.Label(weekX, weekY + 20, 116, '', 18, 'FFFFFF', 32)
-        barY := compact ? 68 : 130
-        this.progress := g.AddProgress('x14 y' barY ' w' (this.width - 88) ' h3 cA78BFA Background3E394C -Theme', 0)
-        this.percent := this.Label(this.width - 65, barY - 7, 65, '', 9, 'E3D9FF', 20)
+        this.width := compact ? 244 : 160
+        this.height := compact ? 26 : 48
+        this.day := this.Label(2, 2, 142, '', 10, 'FFFFFF', 22)
+        this.week := this.Label(compact ? 148 : 2, compact ? 2 : 24, 96, '', 10, 'D8C9FF', 22)
         this.Update(app.ReportCounts())
         if app.overlayMoving {
             g.BackColor := '202023'
@@ -47,10 +39,8 @@ class ReportOverlay {
         pair.front.Text := text
     }
     Update(stats) {
-        this.SetText(this.day, stats.day ' / ' this.app.norm)
-        this.SetText(this.week, stats.week '')
-        percent := Round(stats.day / this.app.norm * 100)
-        this.SetText(this.percent, percent '%')
-        this.progress.Value := Min(100, percent)
+        this.SetText(this.day, 'День: ' stats.day ' / ' this.app.norm)
+        this.SetText(this.week, 'Нед.: ' stats.week)
+
     }
 }

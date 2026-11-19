@@ -10,9 +10,10 @@ class GameWindow {
         return className = 'grcWindow' && RegExMatch(title, 'i)(Grand Theft Auto V\b|GTA ?(?:V|5)\b|RAGE Multiplayer|Majestic)') && !RegExMatch(title, 'i)launcher')
     }
     Active() {
-        try return this.hwnd && WinActive('ahk_id ' this.hwnd) && WinGetPID(this.hwnd) = this.pid
-        catch TargetError
+        if !this.hwnd || DllCall('GetForegroundWindow', 'ptr') != this.hwnd
             return false
+        DllCall('GetWindowThreadProcessId', 'ptr', this.hwnd, 'uint*', &ownerPID := 0)
+        return ownerPID = this.pid
     }
     Refresh() {
         if this.hwnd && DllCall('IsWindow', 'ptr', this.hwnd) {
