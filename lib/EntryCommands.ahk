@@ -1,5 +1,6 @@
 class EntryCommands {
     static commands := ['/hidecheatinfo', '/showcheats', '/dl', '/esp', '/templeader', '/chide', '/zzdebug', '/objdl', '/netstat']
+    static simpleCommands := ['/hidecheatinfo', '/showcheats', '/dl', '/chide', '/zzdebug', '/objdl', '/netstat']
     __New(app) {
         this.app := app
         this.selected := Map()
@@ -17,16 +18,16 @@ class EntryCommands {
         app.Button(page, 298, 122, 150, '← На главную', (*) => app.ShowPage('Основное'))
         app.Label(page, 298, 178, 810, 'Отметь команды для запуска одним биндом', 14, , 700)
         this.buttons := Map()
-        for index, command in EntryCommands.commands {
+        for index, command in EntryCommands.simpleCommands {
             x := 298 + Mod(index - 1, 3) * 280
             y := 221 + ((index - 1) // 3) * 48
             this.buttons[command] := app.Button(page, x, y, 264, command, this.Toggle.Bind(this, command), false, 38)
         }
         app.Label(page, 298, 383, 240, 'Тип /esp', 10, 'B8B8C0')
         this.espButtons := Map()
-        loop 3 {
-            n := A_Index
-            this.espButtons[n] := app.Button(page, 298 + (n - 1) * 88, 411, 80, n, this.ChooseESP.Bind(this, n), false, 38)
+        loop 4 {
+            n := A_Index - 1
+            this.espButtons[n] := app.Button(page, 298 + n * 66, 411, 60, n = 0 ? 'Выкл.' : n, this.ChooseESP.Bind(this, n), false, 38)
         }
         app.Label(page, 578, 383, 500, 'Фракция для /templeader', 10, 'B8B8C0')
         this.faction := app.Button(page, 578, 411, 544, '', this.ChooseFaction.Bind(this), false, 38)
@@ -44,13 +45,18 @@ class EntryCommands {
         if !this.HasOwnProp('buttons')
             return
         for command, button in this.buttons {
-            button.Text := (this.selected[command] ? '● ' : '○ ') command
+            label := (this.selected[command] ? '● ' : '○ ') command
+            if button.Text != label
+                button.Text := label
             Theme.Select(button, this.selected[command])
         }
         for n, button in this.espButtons
-            Theme.Select(button, n = this.app.esp)
+            Theme.Select(button, this.selected['/esp'] ? n = this.app.esp : n = 0)
         id := this.app.GetFactionID()
-        this.faction.Text := id = '' ? 'Выбрать фракцию' : this.app.faction ' /templeader ' id ' ⌄'
+        label := !this.selected['/templeader'] ? 'Не использовать ⌄' : (id = '' ? 'Выбрать фракцию ⌄' : this.app.faction ' /templeader ' id ' ⌄')
+        if this.faction.Text != label
+            this.faction.Text := label
+        Theme.Select(this.faction, this.selected['/templeader'])
     }
     Toggle(command, *) {
         this.selected[command] := !this.selected[command]
@@ -58,16 +64,27 @@ class EntryCommands {
         this.Refresh()
     }
     ChooseESP(n, *) {
-        this.app.SetESP(n)
+        this.selected['/esp'] := n != 0
+        IniWrite n != 0 ? 1 : 0, this.app.ini, 'EntryCommands', 'esp'
+        if n != 0
+            this.app.SetESP(n)
         this.Refresh()
     }
     ChooseFaction(*) {
-        choices := []
+        choices := ['Не использовать']
         for name in BinderFeatures.factionIDs
             choices.Push(name)
-        selected := DarkDialog.Choice('Фракция для /templeader', choices, this.app.faction)
-        if selected != ''
-            this.app.SetFaction(selected)
+        selected := DarkDialog.Choice('Фракция для /templeader', choices, this.selected['/templeader'] ? this.app.faction : 'Не использовать')
+        if selected = ''
+            return
+        this.SelectFaction(selected)
+        this.Refresh()
+    }
+    SelectFaction(name) {
+        this.selected['/templeader'] := name != 'Не использовать'
+        IniWrite this.selected['/templeader'] ? 1 : 0, this.app.ini, 'EntryCommands', 'templeader'
+        if this.selected['/templeader']
+            this.app.SetFaction(name)
         this.Refresh()
     }
     Conflict(key, trigger) {

@@ -101,9 +101,6 @@ class BinderFeatures {
         }
         this.faction := name
         IniWrite name, this.ini, 'General', 'Faction'
-        for label, button in this.factionButtons
-            Theme.Select(button, label != 'Все' && label = name)
-        this.factionButtons['Все'].Text := 'Все'
         if this.HasOwnProp('entry')
             this.entry.Refresh()
     }
@@ -164,8 +161,6 @@ class BinderFeatures {
     SetESP(number, *) {
         this.esp := number
         IniWrite number, this.ini, 'General', 'ESP'
-        for n, button in this.espButtons
-            Theme.Select(button, n = number)
         if this.HasOwnProp('entry')
             this.entry.Refresh()
     }

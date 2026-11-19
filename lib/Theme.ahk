@@ -88,6 +88,8 @@ class Theme {
             this.items.Delete(hwnd)
         }
         result := DllCall('comctl32\DefSubclassProc', 'ptr', hwnd, 'uint', msg, 'uptr', wp, 'ptr', lp, 'ptr')
+        if msg = 0xC && !item.panel
+            DllCall('RedrawWindow', 'ptr', hwnd, 'ptr', 0, 'ptr', 0, 'uint', 0x101)
         if msg = 7 || msg = 8 || msg = 0x201 || msg = 0x202 || msg = 0xF3
             DllCall('InvalidateRect', 'ptr', hwnd, 'ptr', 0, 'int', false)
         return result

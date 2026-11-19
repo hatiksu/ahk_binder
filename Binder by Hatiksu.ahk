@@ -36,7 +36,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.0'
+        this.version := '0.10.1'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -634,24 +634,6 @@ RunChecks() {
             throw Error('Не работает фильтр категорий')
     }
     app.category.Select(1)
-    for faction in ['LSPD', 'FIB', 'SANG', 'LSCSD'] {
-        CheckClick(app.factionButtons[faction])
-        if app.faction != faction
-            throw Error('Не работает кнопка фракции: ' faction)
-    }
-    for extra in ['GOV', 'EMS', 'WN', 'BALLAS', 'VAGOS', 'FAM', 'BLOODS', 'MARA'] {
-        app.SetFaction(extra)
-        if app.factionButtons['Все'].Text != 'Все' || Theme.items[app.factionButtons['Все'].Hwnd].selected || IniRead(app.ini, 'General', 'Faction') != extra
-            throw Error('Не работает дополнительная фракция ' extra)
-    }
-    SetTimer(ChooseEMS, -100)
-    CheckClick(app.factionButtons['Все'])
-    if app.faction != 'EMS'
-        throw Error('Кнопка остальных фракций не открывает выбор')
-    SetTimer((*) => CheckClick(DarkDialog.last.buttons[2]), -100)
-    CheckClick(app.factionButtons['Все'])
-    if app.faction != 'EMS'
-        throw Error('Отмена выбора изменила фракцию')
     for faction, id in BinderFeatures.factionIDs {
         app.SetFaction(faction)
         if app.PrepareCommands('/templeader{space}') != '/templeader ' id '{space}' || app.PrepareCommands('/templeader 99') != '/templeader ' id
@@ -666,11 +648,11 @@ RunChecks() {
     CheckClick(app.genderButtons['male'])
     if app.gender != 'male'
         throw Error('Не работает мужской набор')
-    CheckClick(app.espButtons[2])
+    app.entry.ChooseESP(2)
     if app.PrepareCommands('/esp 3') != '/esp 2'
         throw Error('Не работает выбор /esp')
     app.ShowPage('Команды при входе')
-    if app.currentPage != 'Команды при входе' || app.entry.buttons.Count != 9
+    if app.currentPage != 'Команды при входе' || app.entry.buttons.Count != 7
         throw Error('Не открывается список команд при входе')
     for command in EntryCommands.commands {
         if !app.entry.selected[command]
@@ -690,7 +672,16 @@ RunChecks() {
         rejected := true
     if !rejected
         throw Error('Темплидерка запускается без выбранной фракции')
-    app.SetFaction('FIB')
+    app.entry.ChooseESP(0)
+    app.entry.SelectFaction('Не использовать')
+    queue := app.entry.Queue()
+    if queue.Length != 7 || app.entry.buttons.Has('/esp') || app.entry.buttons.Has('/templeader')
+        throw Error('Дубли команд или выключенные команды остались в очереди')
+    savedEntry := EntryCommands(app)
+    if savedEntry.selected['/esp'] || savedEntry.selected['/templeader']
+        throw Error('Выключение команд не сохранилось')
+    app.entry.ChooseESP(3)
+    app.entry.SelectFaction('FIB')
     app.entry.triggerField.Value := '.entry_test'
     app.entry.keyField.Value := 'F9'
     app.entry.Save()
