@@ -1,4 +1,3 @@
-; Выбор клавиш без светлого системного поля Hotkey.
 class KeyPicker {
     __New(g, options, value := '') {
         this.control := Theme.Button(g, options, '', '252527')
@@ -67,7 +66,6 @@ KeyLabel(key) {
     return label name
 }
 
-; Тёмная кнопка-фильтр вместо белого ComboBox.
 class CategoryPicker {
     __New(g, options, choices, changed) {
         this.control := Theme.Button(g, options, '', '252527')

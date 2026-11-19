@@ -38,6 +38,7 @@ class BinderView extends BinderFeatures {
         this.statusText := g.AddText('x276 y724 w870 h20 c777780 BackgroundTrans Hidden', '')
         this.Card('Основное', 272, 90, 884, 623)
         this.BuildHome()
+        this.entry.Build()
         this.BuildTriggers()
         this.BuildBinds()
         this.BuildSettings()
@@ -190,6 +191,7 @@ class BinderView extends BinderFeatures {
         this.Label(page, 298, 322, 700, '⌁ Рабочее пространство', 13, , 700)
         this.Button(page, 298, 357, 238, '▣ Открыть конфиги профиля', (*) => Run(this.dir))
         this.Button(page, 550, 357, 238, '↗ Экспортировать триггеры', (*) => this.Export())
+        this.Button(page, 802, 357, 224, 'Команды при входе', (*) => this.ShowPage('Команды при входе'), true)
         this.Label(page, 298, 423, 700, '☷ Базовые параметры', 13, , 700)
         this.Label(page, 302, 465, 510, 'Фракция для /templeader', 9, 'B8B8C0', 600)
         this.Label(page, 856, 465, 270, 'Род написания триггеров', 9, 'B8B8C0', 600)
@@ -405,7 +407,7 @@ class BinderView extends BinderFeatures {
             subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
                 'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
                 'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
-                'Change Log', 'История обновлений Binder by Hatiksu', 'Гайд', 'Как настроить и использовать Binder by Hatiksu')
+                'Change Log', 'История обновлений Binder by Hatiksu', 'Гайд', 'Как настроить и использовать Binder by Hatiksu', 'Команды при входе', 'Один бинд для выбранных команд')
             this.pageTitle.Text := name
             this.pageSubtitle.Text := subtitles[name]
             if name = 'Триггеры'

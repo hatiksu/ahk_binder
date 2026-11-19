@@ -1,114 +1,5 @@
-﻿#Requires AutoHotkey v2
+#Requires AutoHotkey v2
 
-/**
- * OCR library: a wrapper for the the UWP Windows.Media.Ocr library.
- * Based on the UWP OCR function for AHK v1 by malcev.
- * 
- * Ways of initiating OCR:
- * OCR(RandomAccessStreamOrSoftwareBitmap, Options?)
- * OCR.FromDesktop(Options?)
- * OCR.FromMonitor(Monitor?, Options?)
- * OCR.FromRect(X, Y, W, H, Options?)
- * OCR.FromWindow(WinTitle:="", Options?, WinText:="", ExcludeTitle:="", ExcludeText:="")
- *      Note: the result object coordinates will be in CoordMode "Pixel"
- * OCR.FromFile(FileName, Options?)
- * OCR.FromBitmap(bitmap, Options?, hDC?)
- * OCR.FromPDF(FileName, Options?, Start:=1, End?, Password:="") => returns an array of results for each PDF page
- * OCR.FromPDFPage(FileName, page, Options?)
- *   Helper functions for PDF OCR:
- *      OCR.GetPdfPageCount(FileName, Password:="")
- *      OCR.GetPdfPageProperties(FileName, Page, Password:="")
- * 
- * Options can be an object containing none or all of these elements:
- * {
- *      lang: OCR language. Default is first from available languages. This can also be a function which evaluates to a language string.
- *      scale: a Float scale factor to zoom the image in or out, which might improve detection. 
- *             The resulting coordinates will be adjusted to scale. Default is 1.
- *      grayscale: Boolean 0 | 1 whether to convert the image to black-and-white. Default is 0.
- *      monochrome: 0-255, converts all pixels with luminosity less than the threshold to black, otherwise to white. Default is 0 (no conversion).
- *      invertcolors: Boolean 0 | 1, whether to invert the colors of the image. Default is 0.
- *      rotate: 0 | 90 | 180 | 270, can be used to rotate the image clock-wise by degrees. Default is 0.
- *      flip: 0 | "x" | "y", can be used to flip the image on the x- or y-axis. Default is 0.
- *      x, y, w, h: can be used to crop the image. This is applied before scaling. Default is no cropping.
- *      decoder: gif | ico | jpeg | jpegxr | png | tiff | bmp. Optional bitmap codec name to decode RandomAccessStream. Default is automatic detection. 
- * }
- * 
- * Note: Options also accepts any optional parameters after it like named parameters.
- * Eg. OCR.FromMonitor({lang:"en-us", monitor:2})
- * 
- * Additional methods:
- * OCR.GetAvailableLanguages()
- * OCR.LoadLanguage(lang:="FirstFromAvailableLanguages")
- * OCR.WaitText(needle, timeout:=-1, func?, casesense:=False, comparefunc?)
- *      Calls a func (the provided OCR method) until a string is found
- * OCR.WordsBoundingRect(words*)
- *      Returns the bounding rectangle for multiple words
- * OCR.ClearAllHighlights()
- *      Removes all highlights created by Result.Highlight
- * OCR.Cluster(objs, eps_x:=-1, eps_y:=-1, minPts:=1, compareFunc?, &noise?)
- *      Clusters objects (by default based on distance from eachother). Can be used to create more
- *      accurate "Line" results.
- * OCR.SortArray(arr, optionsOrCallback:="N", key?)
- *      Sorts an array in-place, optionally by object keys or using a callback function.
- * OCR.ReverseArray(arr)
- *      Reverses an array in-place.
- * OCR.UniqueArray(arr)
- *      Returns an array with unique values.
- * OCR.FlattenArray(arr)
- *      Returns a one-dimensional array from a multi-dimensional array
- * 
- * Properties:
- * OCR.MaxImageDimension
- * MinImageDimension is not documented, but appears to be 40 pixels (source: user FanaticGuru in AutoHotkey forums)
- * OCR.PerformanceMode
- *      Increases speed of OCR acquisition by about 20-50ms if set to 1, but also increases CPU usage. Default is 0.
- * OCR.DisplayImage
- *      If set to True then the captured image is displayed on the screen before proceeding to OCR-ing the image.
- * 
- * OCR returns an OCR.Result object:
- * Result.Text         => All recognized text
- * Result.TextAngle    => Clockwise rotation of the recognized text 
- * Result.Lines        => Array of all OCR.Line objects
- * Result.Words        => Array of all OCR.Word objects
- * Result.ImageWidth   => Used image width
- * Result.ImageHeight  => Used image height
- * 
- * Result.FindString(Needle, Options?)
- *      Finds a string in the result. Possible options (see descriptions at the function definition): 
- *      {CaseSense: False, IgnoreLinebreaks: False, AllowOverlap: false, i: 1, x, y, w, h, SearchFunc}
- * Result.FindStrings(Needle, Options?)
- *      Finds all strings in the result. 
- * Result.Filter(callback)
- *      Returns a filtered result object that contains only words that satisfy the callback function
- * Result.Crop(x1, y1, x2, y2)
- *      Crops the result object to contain only results from an area defined by points (x1,y1) and (x2,y2). 
- * 
- * OCR.Line object:
- * Line.Text         => Recognized text of the line
- * Line.Words        => Array of Word objects for the Line
- * Line.x,y,w,h      => Size and location of the Line. 
- * 
- * OCR.Word object:
- * Word.Text         => Recognized text of the word
- * Word.x,y,w,h      => Size and location of the Word. 
- * Word.BoundingRect => Bounding rectangle of the Word in format {x,y,w,h}. 
- * 
- * OCR.Result, OCR.Line, and OCR.Word also all have some common methods:
- * 
- * Result.Click(WhichButton?, ClickCount?, DownOrUp?)
- *      Clicks an object (Word, FindString result etc)
- * Result.ControlClick(WinTitle?, WinText?, WhichButton?, ClickCount?, Options?, ExcludeTitle?, ExcludeText?)
- *      ControlClicks an object (Word, FindString result etc)
- * Result.Highlight(showTime?, color:="Red", d:=2)
- *      Highlights a Word, Line, or object with {x,y,w,h} properties on the screen (default: 2 seconds), or removes the highlighting
- * 
- * Additional notes:
- * Languages are recognized in BCP-47 language tags. Eg. OCR.FromFile("myfile.bmp", {lang: "en-AU"})
- * Languages can be installed for example with PowerShell (run as admin): Install-Language <language-tag>
- *      or from Language settings in Settings.
- * Not all language packs support OCR though. A list of supported language can be gotten from 
- * Powershell (run as admin) with the following command: Get-WindowsCapability -Online | Where-Object { $_.Name -Like 'Language.OCR*' } 
- */
 class OCR {
     static Version => "2.0.0"
     static IID_IRandomAccessStream := "{905A0FE1-BC53-11DF-8C49-001E4FC686DA}"
@@ -150,87 +41,21 @@ class OCR {
         this.BitmapEncoderStatics := this.CreateClass("Windows.Graphics.Imaging.BitmapEncoder", IBitmapDecoderStatics := "{a74356a7-a4e4-4eb9-8e40-564de7e1ccb2}")
         this.SoftwareBitmapStatics := this.CreateClass("Windows.Graphics.Imaging.SoftwareBitmap", ISoftwareBitmapStatics := "{df0385db-672f-4a9d-806e-c2442f343e86}")
         this.OcrEngineStatics := this.CreateClass("Windows.Media.Ocr.OcrEngine", IOcrEngineStatics := "{5BFFA85A-3384-3540-9940-699120D428A8}")
-        ComCall(6, this.OcrEngineStatics, "uint*", &MaxImageDimension:=0)   ; MaxImageDimension
+        ComCall(6, this.OcrEngineStatics, "uint*", &MaxImageDimension:=0)
         this.MaxImageDimension := MaxImageDimension
         DllCall("Dwmapi\DwmIsCompositionEnabled", "Int*", &compositionEnabled:=0)
         this.CAPTUREBLT := compositionEnabled ? 0 : 0x40000000
-        /*  // Based on code by AHK forums user Xtra
-            unsigned int Convert_GrayScale(unsigned int bitmap[], unsigned int w, unsigned int h, unsigned int Stride)
-            {
-                unsigned int a, r, g, b, gray, ARGB;
-                unsigned int x, y, offset = Stride/4;
-                for (y = 0; y < h * offset; y += offset) {
-                    for (x = 0; x < w; ++x) {
-                        ARGB = bitmap[x+y];
-                        a = ARGB & 0xFF000000;
-                        r = (ARGB & 0x00FF0000) >> 16;
-                        g = (ARGB & 0x0000FF00) >> 8;
-                        b = (ARGB & 0x000000FF);
-                        gray = ((300 * r) + (590 * g) + (110 * b)) >> 10;
-                        bitmap[x+y] = (gray << 16) | (gray << 8) | gray | a;
-                    }
-                }
-                return 0;
-            }
-         */
         this.GrayScaleMCode := this.MCode((A_PtrSize = 4) 
         ? "2,x86:VVdWU4PsCIt8JCiLdCQki0QkIMHvAg+v94k0JIX2dH+FwHR7jTS9AAAAAIl0JASLdCQcjRyGMfaNtCYAAAAAkItEJByNDLCNtCYAAAAAZpCLEYPBBInQD7buwegQae1OAgAAD7bAacAsAQAAAegPtuqB4gAAAP9r7W4B6MHoConFCcLB4AjB5RAJ6gnQiUH8Odl1vAH+A1wkBDs0JHKhg8QIMcBbXl9dww==" 
         : "2,x64:V1ZTQcHpAkSJxkiJy0GJ00EPr/GF9nRnRTHAhdJ0YJBEicEPH0QAAInIg8EBTI0Ug0GLEonQD7b+wegQaf9OAgAAD7bAacAsAQAAAfgPtvqB4gAAAP9r/24B+MHoConHCcLB4AjB5xAJ+gnCQYkSRDnZdbRFAchFActBOfByoTHAW15fww==")
-        /*
-            unsigned int Invert_Colors(unsigned int bitmap[], unsigned int w, unsigned int h, unsigned int Stride)
-            {
-                unsigned int a, r, g, b, gray, ARGB;
-                unsigned int x, y, offset = Stride/4;
-                for (y = 0; y < h * offset; y += offset) {
-                    for (x = 0; x < w; ++x) {
-                        ARGB = bitmap[x+y];
-                        a = ARGB & 0xFF000000;
-                        r = (ARGB & 0x00FF0000) >> 16;
-                        g = (ARGB & 0x0000FF00) >> 8;
-                        b = (ARGB & 0x000000FF);
-                        bitmap[x+y] = ((255-r) << 16) | ((255-g) << 8) | (255-b) | a;
-                    }
-                }
-                return 0;
-            }
-        */
         this.InvertColorsMCode := this.MCode((A_PtrSize = 4)
         ? "2,x86:VVdWU4PsCItsJCiLfCQki0QkIMHtAg+v/Yk8JIX/dGeFwHRjjTytAAAAAIl8JASLfCQcjTSHMf+NtCYAAAAAkItEJByNDLiNtCYAAAAAZpCLEYPBBInQidOB4v8AAP/30PfTgPL/JQAA/wCB4wD/AAAJ2AnQiUH8OfF11AHvA3QkBDs8JHK5g8QIMcBbXl9dww=="
         : "2,x64:V1ZTQcHpAkSJx0iJzonTQQ+v+YX/dFNFMcCF0nRMZpBEicEPH0QAAInIg8EBTI0chkGLE4nQQYnSgeL/AAD/99BB99KA8v8lAAD/AEGB4gD/AABECdAJ0EGJAznLdclFAchEActBOfhytjHAW15fww==")
-        /*
-            unsigned int Convert_Monochrome(unsigned int bitmap[], unsigned int w, unsigned int h, unsigned int Stride, unsigned int threshold)
-            {
-                unsigned int a, r, g, b, ARGB;
-                unsigned int x, y, offset = Stride / 4;
-                for (y = 0; y < h * offset; y += offset) {
-                    for (x = 0; x < w; ++x) {
-                        ARGB = bitmap[x + y];
-                        a = ARGB & 0xFF000000;
-                        r = (ARGB & 0x00FF0000) >> 16;
-                        g = (ARGB & 0x0000FF00) >> 8;
-                        b = (ARGB & 0x000000FF);
-                        unsigned int luminance = (77 * r + 150 * g + 29 * b) >> 8;
-                        bitmap[x + y] = (luminance > threshold) ? 0xFFFFFFFF : 0xFF000000;
-                    }
-                }
-                return 0;
-            }
-        */
         this.MonochromeMCode := this.MCode((A_PtrSize = 4)
         ? "2,x86:VVdWU4PsDIt0JCyLTCQoi0QkJIt8JDDB7gIPr86JNCSJTCQEhcl0aYXAdGXB5gIx7Yl0JAiLdCQgjTSGjXQmAItEJCCNDKiNtCYAAAAAZpCLEYnTD7bGD7bSwesQacCWAAAAD7bba9Ida9tNAdgB0MHoCDn4dinHAf////+DwQQ58XXMAywkA3QkCDlsJAR3r4PEDDHAW15fXcONdCYAkMcBAAAA/4PBBDnxdaMDLCQDdCQIOWwkBHeG69U="
         : "2,x64:VVdWU4t0JEhBwekCRInHSInLQYnTQQ+v+YX/dFyF0nRYRTHADx9AAESJwQ8fRAAAichMjRSDQYsSidUPtsYPttLB7RBpwJYAAABAD7bta9Ida+1NAegB0MHoCDnwdiGDwQFBxwL/////QTnLdcJFAchFActEOcd3rzHAW15fXcODwQFBxwIAAAD/RDnZdaFFAchFActEOcd3juvd")
     }
 
-    /**
-     * Returns an OCR results object for an IRandomAccessStream.
-     * Images of other types should be first converted to this format (eg from file, from bitmap).
-     * @param RandomAccessStreamOrSoftwareBitmap Pointer or an object containing a ptr to a RandomAccessStream or SoftwareBitmap
-     * @param {String} lang OCR language. Default is first from available languages.
-     * @param {Integer|Object} transform Either a scale factor number, or an object {scale:Float, grayscale:Boolean, invertcolors:Boolean, monochrome:0-255, rotate: 0 | 90 | 180 | 270, flip: 0 | "x" | "y"}
-     * @param {String} decoder Optional bitmap codec name to decode RandomAccessStream. Default is automatic detection.
-     *  Possible values are gif, ico, jpeg, jpegxr, png, tiff, bmp.
-     * @returns {OCR.Result} 
-     */
     static Call(RandomAccessStreamOrSoftwareBitmap, Options:=0) {
         local SoftwareBitmap := 0, RandomAccessStream := 0, lang:="FirstFromAvailableLanguages", width, height, x := 0, y := 0, w := 0, h := 0, scale, grayscale, invertcolors, monochrome, OcrResult := this.Result(), Result, transform := 0, decoder := 0
         this.__ExtractTransformParameters(Options, &transform)
@@ -239,10 +64,10 @@ class OCR {
         this.LoadLanguage(lang)
         local customRegion := x || y || w || h
 
-        try SoftwareBitmap := ComObjQuery(RandomAccessStreamOrSoftwareBitmap, "{689e0708-7eef-483f-963f-da938818e073}") ; ISoftwareBitmap
+        try SoftwareBitmap := ComObjQuery(RandomAccessStreamOrSoftwareBitmap, "{689e0708-7eef-483f-963f-da938818e073}")
         if SoftwareBitmap {
-            ComCall(8, SoftwareBitmap, "uint*", &width:=0)   ; get_PixelWidth
-            ComCall(9, SoftwareBitmap, "uint*", &height:=0)   ; get_PixelHeight
+            ComCall(8, SoftwareBitmap, "uint*", &width:=0)
+            ComCall(9, SoftwareBitmap, "uint*", &height:=0)
             this.ImageWidth := width, this.ImageHeight := height
             if (Floor(width*scale) > this.MaxImageDimension) or (Floor(height*scale) > this.MaxImageDimension)
                throw ValueError("Image is too big - " width "x" height ".`nIt should be maximum - " this.MaxImageDimension " pixels (with scale applied)")
@@ -254,14 +79,14 @@ class OCR {
 
         if decoder {
             ComCall(this.Vtbl_GetDecoder.%decoder%, this.BitmapDecoderStatics, "ptr", DecoderGUID:=Buffer(16))
-            ComCall(15, this.BitmapDecoderStatics, "ptr", DecoderGUID, "ptr", RandomAccessStream, "ptr*", BitmapDecoder:=ComValue(13,0))   ; CreateAsync
+            ComCall(15, this.BitmapDecoderStatics, "ptr", DecoderGUID, "ptr", RandomAccessStream, "ptr*", BitmapDecoder:=ComValue(13,0))
         } else
-            ComCall(14, this.BitmapDecoderStatics, "ptr", RandomAccessStream, "ptr*", BitmapDecoder:=ComValue(13,0))   ; CreateAsync
+            ComCall(14, this.BitmapDecoderStatics, "ptr", RandomAccessStream, "ptr*", BitmapDecoder:=ComValue(13,0))
             this.WaitForAsync(&BitmapDecoder)
 
         BitmapFrame := ComObjQuery(BitmapDecoder, IBitmapFrame := "{72A49A1C-8081-438D-91BC-94ECFC8185C6}")
-        ComCall(12, BitmapFrame, "uint*", &width:=0)   ; get_PixelWidth
-        ComCall(13, BitmapFrame, "uint*", &height:=0)   ; get_PixelHeight
+        ComCall(12, BitmapFrame, "uint*", &width:=0)
+        ComCall(13, BitmapFrame, "uint*", &height:=0)
         if (width > this.MaxImageDimension) or (height > this.MaxImageDimension)
            throw ValueError("Image is too big - " width "x" height ".`nIt should be maximum - " this.MaxImageDimension " pixels")
 
@@ -269,13 +94,13 @@ class OCR {
         OcrResult.ImageWidth := width, OcrResult.ImageHeight := height
         if !(customRegion || rotate || flip) && (width < 40 || height < 40 || scale != 1) {
             scale := scale = 1 ? 40.0 / Min(width, height) : scale
-            ComCall(7, this.BitmapTransform, "int", width := Floor(width*scale)) ; put_ScaledWidth
-            ComCall(9, this.BitmapTransform, "int", height := Floor(height*scale)) ; put_ScaledHeight
-            ComCall(8, BitmapFrame, "uint*", &BitmapPixelFormat:=0) ; get_BitmapPixelFormat
-            ComCall(9, BitmapFrame, "uint*", &BitmapAlphaMode:=0) ; get_BitmapAlphaMode
-            ComCall(8, BitmapFrameWithSoftwareBitmap, "uint", BitmapPixelFormat, "uint", BitmapAlphaMode, "ptr", this.BitmapTransform, "uint", IgnoreExifOrientation := 0, "uint", DoNotColorManage := 0, "ptr*", SoftwareBitmap:=this.IBase()) ; GetSoftwareBitmapAsync
+            ComCall(7, this.BitmapTransform, "int", width := Floor(width*scale))
+            ComCall(9, this.BitmapTransform, "int", height := Floor(height*scale))
+            ComCall(8, BitmapFrame, "uint*", &BitmapPixelFormat:=0)
+            ComCall(9, BitmapFrame, "uint*", &BitmapAlphaMode:=0)
+            ComCall(8, BitmapFrameWithSoftwareBitmap, "uint", BitmapPixelFormat, "uint", BitmapAlphaMode, "ptr", this.BitmapTransform, "uint", IgnoreExifOrientation := 0, "uint", DoNotColorManage := 0, "ptr*", SoftwareBitmap:=this.IBase())
         } else {
-            ComCall(6, BitmapFrameWithSoftwareBitmap, "ptr*", SoftwareBitmap:=this.IBase())   ; GetSoftwareBitmapAsync
+            ComCall(6, BitmapFrameWithSoftwareBitmap, "ptr*", SoftwareBitmap:=this.IBase())
         }
         this.WaitForAsync(&SoftwareBitmap)
         if customRegion || rotate || flip || scale != 1
@@ -284,11 +109,11 @@ class OCR {
         SoftwareBitmapCommon:
 
         if (grayscale || invertcolors || monochrome || this.DisplayImage) {
-            ComCall(15, SoftwareBitmap, "int", 2, "ptr*", &BitmapBuffer := 0) ; LockBuffer
+            ComCall(15, SoftwareBitmap, "int", 2, "ptr*", &BitmapBuffer := 0)
             MemoryBuffer := ComObjQuery(BitmapBuffer, "{fbc4dd2a-245b-11e4-af98-689423260cf8}")
-            ComCall(6, MemoryBuffer, "ptr*", &MemoryBufferReference := 0) ; CreateReference
+            ComCall(6, MemoryBuffer, "ptr*", &MemoryBufferReference := 0)
             BufferByteAccess := ComObjQuery(MemoryBufferReference, "{5b0d3235-4dba-4d44-865e-8f1d0e4fd04d}")
-            ComCall(3, BufferByteAccess, "ptr*", &SoftwareBitmapByteBuffer:=0, "uint*", &BufferSize:=0) ; GetBuffer
+            ComCall(3, BufferByteAccess, "ptr*", &SoftwareBitmapByteBuffer:=0, "uint*", &BufferSize:=0)
            
             if grayscale
                 DllCall(this.GrayScaleMCode, "ptr", SoftwareBitmapByteBuffer, "uint", width, "uint", height, "uint", (width*4+3) // 4 * 4, "cdecl uint")
@@ -308,14 +133,13 @@ class OCR {
                 this.DisplayHBitmap(hbm)
             }
             
-            BufferByteAccess := "", ObjRelease(MemoryBufferReference), MemoryBuffer := "", ObjRelease(BitmapBuffer) ; Release in correct order
+            BufferByteAccess := "", ObjRelease(MemoryBufferReference), MemoryBuffer := "", ObjRelease(BitmapBuffer)
         }
 
-        ComCall(6, this.OcrEngine, "ptr", SoftwareBitmap, "ptr*", Result:=ComValue(13,0))   ; RecognizeAsync
+        ComCall(6, this.OcrEngine, "ptr", SoftwareBitmap, "ptr*", Result:=ComValue(13,0))
         this.WaitForAsync(&Result)
         OcrResult.Ptr := Result.Ptr, ObjAddRef(OcrResult.ptr)
 
-        ; Cleanup
         if RandomAccessStream is this.IBase
             this.CloseIClosable(RandomAccessStream)
         if SoftwareBitmap is this.IBase
@@ -330,10 +154,9 @@ class OCR {
     static ClearAllHighlights() => this.Result.Prototype.Highlight("clearall")
 
     class Result extends OCR.Common {
-        ; Gets the recognized text.
         Text {
             get {
-                ComCall(8, this, "ptr*", &hAllText:=0)   ; get_Text
+                ComCall(8, this, "ptr*", &hAllText:=0)
                 buf := DllCall("Combase.dll\WindowsGetStringRawBuffer", "ptr", hAllText, "uint*", &length:=0, "ptr")
                 this.DefineProp("Text", {Value:StrGet(buf, "UTF-16")})
                 this.__OCR.DeleteHString(hAllText)
@@ -341,16 +164,14 @@ class OCR {
             }
         }
 
-        ; Gets the clockwise rotation of the recognized text, in degrees, around the center of the image.
         TextAngle {
             get => (ComCall(7, this, "double*", &value:=0), value)
         }
 
-        ; Returns all Line objects for the result.
         Lines {
             get {
-                ComCall(6, this, "ptr*", LinesList:=ComValue(13, 0)) ; get_Lines
-                ComCall(7, LinesList, "int*", &count:=0) ; count
+                ComCall(6, this, "ptr*", LinesList:=ComValue(13, 0))
+                ComCall(7, LinesList, "int*", &count:=0)
                 lines := []
                 loop count {
                     ComCall(6, LinesList, "int", A_Index-1, "ptr*", Line:=this.__OCR.Line(this)) 
@@ -361,7 +182,6 @@ class OCR {
             }
         }
 
-        ; Returns all Word objects for the result. Equivalent to looping over all the Lines and getting the Words.
         Words {
             get {
                 local words := [], line, word
@@ -377,33 +197,8 @@ class OCR {
             get => this.DefineProp("BoundingRect", {Value:this.__OCR.WordsBoundingRect(this.Words*)}).BoundingRect
         }
 
-        /**
-         * Finds a string in the search results, and returns a new Result object.
-         * If the match is partial then the result will contain the whole word: in "hello world" searching "wo" will return "world".
-         * To force a full word search instead of a partial search, use IgnoreLinebreaks:True 
-         *  and add a space to the beginning and end: " hello "
-         * To search multi-line matches, set IgnoreLinebreaks:True and use a linebreak in the needle: "hello`nworld"
-         * @param Needle The string to find. 
-         * @param Options Extra search options object, which can contain the following properties:
-         *  CaseSense: False (this is ignored if a custom SearchFunc is used)
-         *  IgnoreLinebreaks: False (if this is True, then linebreaks are converted to whitespaces, otherwise remain `n)
-         *  AllowOverlap: False (if True then the needle can overlap itself)
-         *  i: 1 (which occurrence of the needle to find)
-         *  x, y, w, h: defines the search area inside the result object
-         *  SearchFunc: default is InStr, but if a custom function is provided then it needs to return
-         *      the needle location in the haystack, and accept arguments (Haystack, Needle, &FoundMatch)
-         *      This can used for example to perform a RegEx search by providing RegExMatch
-         * @returns {Object} 
-         */
         FindString(Needle, Options := "") => this.__FindString(Needle, Options, 0)
 
-        /**
-         * Finds all strings matching the needle in the search results. Returns an array of Result objects.
-         * @param Needle The string to find. 
-         * @param Options See Result.FindString. {CaseSense: False, IgnoreLinebreaks: False, AllowOverlap: false, i: 1, x, y, w, h, SearchFunc}
-         *  If i is specified then the result object will contains matches starting from i.
-         * @returns {Array} 
-         */
         FindStrings(Needle, Options := "") => this.__FindString(Needle, Options, true)
 
         __FindString(Needle, Options, All) {
@@ -433,7 +228,7 @@ class OCR {
                 tokenizedHaystack.Push(IgnoreLinebreaks ? " " : "`n")
             }
 
-            fullHaystackNoLinebreaks := StrReplace(fullHaystackLinebreaks, "`n", " ") ; Make sure the words are in the same order as the tokenized version
+            fullHaystackNoLinebreaks := StrReplace(fullHaystackLinebreaks, "`n", " ")
             fullHaystack := IgnoreLinebreaks ? fullHaystackNoLinebreaks : fullHaystackLinebreaks
 
             Needle := RegExReplace(StrReplace(Needle, "`t", " "), " +", " ")
@@ -449,14 +244,13 @@ class OCR {
                     foundNeedle := foundNeedle[]
 
                 foundLen := AllowOverlap ? 1 : StrLen(foundNeedle)
-                currentHaystack := SubStr(currentHaystack, loc + foundLen) ; Remove the match from the haystack, allowing overlap
+                currentHaystack := SubStr(currentHaystack, loc + foundLen)
                 offset += loc + foundLen - 1
 
                 if ++counter < i
                     continue
 
                 tokenizedNeedle := []
-                ; Tokenize the needle
                 for wsNeedle in wsSplit := StrSplit(foundNeedle, " ") {
                     for lbNeedle in lbSplit := StrSplit(wsNeedle, "`n") {
                         tokenizedNeedle.Push(lbNeedle, "`n")
@@ -468,9 +262,8 @@ class OCR {
                 tokenizedNeedle.Pop()
                 
                 preceding := SubStr(fullHaystackNoLinebreaks, 1, offset - foundLen)
-                ; Find first Word location
                 StrReplace(preceding, " ",,, &startingWord:=0)
-                startingWord := startingWord*2 + fullFirst - 1 ; Substracted 1 to allow subsequent loop to just add A_Index
+                startingWord := startingWord*2 + fullFirst - 1
 
                 foundNeedle := "", foundWords := [], foundLines := [], line := this.__OCR.Line(this), line.DefineProp("Words", {value:[]}), line.DefineProp("Text", {value:""})
                 Loop tokenizedNeedle.Length {
@@ -510,12 +303,6 @@ class OCR {
             throw TargetError('The target string "' Needle '" was not found', -1)
         }
     
-        /**
-         * Filters out all the words that do not satisfy the callback function and returns a new OCR.Result object
-         * @param {Object} callback The callback function that accepts a OCR.Word object.
-         * If the callback returns 0 then the word is filtered out (rejected), otherwise is kept.
-         * @returns {OCR.Result}
-         */
         Filter(callback) {
             if !HasMethod(callback)
                 throw ValueError("Filter callback must be a function", -1)
@@ -541,22 +328,12 @@ class OCR {
             return result
         }
     
-        /**
-         * Crops the result object to contain only results from an area defined by points (x1,y1) and (x2,y2).
-         * Note that these coordinates are relative to the result object, not to the screen.
-         * @param {Integer} x1 x coordinate of the top left corner of the search area
-         * @param {Integer} y1 y coordinate of the top left corner of the search area
-         * @param {Integer} x2 x coordinate of the bottom right corner of the search area
-         * @param {Integer} y2 y coordinate of the bottom right corner of the search area
-         * @returns {OCR.Result}
-         */
         Crop(x1:=-100000, y1:=-100000, x2:=100000, y2:=100000) => this.Filter((word) => word.x >= x1 && word.y >= y1 && (word.x+word.w) <= x2 && (word.y+word.h) <= y2)
     }
     class Line extends OCR.Common {
-        ; Gets the recognized text for the line.
         Text {
             get {
-                ComCall(7, this, "ptr*", &hText:=0)   ; get_Text
+                ComCall(7, this, "ptr*", &hText:=0)
                 buf := DllCall("Combase.dll\WindowsGetStringRawBuffer", "ptr", hText, "uint*", &length:=0, "ptr")
                 text := StrGet(buf, "UTF-16")
                 this.__OCR.DeleteHString(hText)
@@ -565,11 +342,10 @@ class OCR {
             }
         }
 
-        ; Gets the Word objects for the line
         Words {
             get {
-                ComCall(6, this, "ptr*", WordsList:=ComValue(13, 0))   ; get_Words
-                ComCall(7, WordsList, "int*", &WordsCount:=0)   ; Words count
+                ComCall(6, this, "ptr*", WordsList:=ComValue(13, 0))
+                ComCall(7, WordsList, "int*", &WordsCount:=0)
                 words := []
                 loop WordsCount {
                    ComCall(6, WordsList, "int", A_Index-1, "ptr*", Word:=this.__OCR.Word(this))
@@ -586,10 +362,9 @@ class OCR {
     }
 
     class Word extends OCR.Common {
-        ; Gets the recognized text for the word
         Text {
             get {
-                ComCall(7, this, "ptr*", &hText:=0)   ; get_Text
+                ComCall(7, this, "ptr*", &hText:=0)
                 buf := DllCall("Combase.dll\WindowsGetStringRawBuffer", "ptr", hText, "uint*", &length:=0, "ptr")
                 text := StrGet(buf, "UTF-16")
                 this.__OCR.DeleteHString(hText)
@@ -598,15 +373,9 @@ class OCR {
             }
         }
 
-        /**
-         * Gets the bounding rectangle of the text in {x,y,w,h} format. 
-         * The bounding rectangles coordinate system will be dependant on the image capture method.
-         * For example, if the image was captured as a rectangle from the screen, then the coordinates
-         * will be relative to the left top corner of the screen.
-         */
         BoundingRect {
             get {
-                ComCall(6, this, "ptr", RECT := Buffer(16, 0))   ; get_BoundingRect
+                ComCall(6, this, "ptr", RECT := Buffer(16, 0))
                 this.DefineProp("x", {Value:Integer(NumGet(RECT, 0, "float"))})
                 , this.DefineProp("y", {Value:Integer(NumGet(RECT, 4, "float"))})
                 , this.DefineProp("w", {Value:Integer(NumGet(RECT, 8, "float"))})
@@ -630,27 +399,12 @@ class OCR {
             get => this.BoundingRect.h
         }
     
-        /**
-         * Highlights the object on the screen with a red box
-         * @param {number} showTime Default is 2 seconds.
-         * * Unset - if highlighting exists then removes the highlighting, otherwise pauses for 2 seconds
-         * * 0 - Indefinite highlighting
-         * * Positive integer (eg 2000) - will highlight and pause for the specified amount of time in ms
-         * * Negative integer - will highlight for the specified amount of time in ms, but script execution will continue
-         * * "clear" - removes the highlighting unconditionally
-         * * "clearall" - remove highlightings from all OCR objects
-         * @param {string} color The color of the highlighting. Default is red.
-         * @param {number} d The border thickness of the highlighting in pixels. Default is 2.
-         * @returns {OCR.Result}
-         */
         Highlight(showTime?, color:="Red", d:=2) {
             static Guis := Map()
             local x, y, w, h, key, oObj, GuiObj, iw, ih
-            ; showTime unset => either highlights for 2s, or removes highlight
-            ; showTime clear => removes highlight
             if IsSet(showTime) {
                 if showTime = "clearall" {
-                    for key, oObj in Guis { ; enum all OCR result objects
+                    for key, oObj in Guis {
                         try oObj.GuiObj.Destroy()
                         SetTimer(oObj.TimerObj, 0)
                     }
@@ -708,12 +462,6 @@ class OCR {
         }
         ClearHighlight() => this.Highlight("clear")
     
-        /**
-         * Clicks an object
-         * If this object (the one Click is called from) contains a "Relative" property (this is
-         * added by default with OCR.FromWindow) containing a hWnd property, then that window will be activated,
-         * otherwise the Relative objects x/y properties values will be added to the x and y coordinates as offsets.
-         */
         Click(WhichButton?, ClickCount?, DownOrUp?) {
             local x := this.x, y := this.y, w := this.w, h := this.h, mode := "Screen", hwnd
             if this.HasProp("Relative") {
@@ -736,16 +484,6 @@ class OCR {
             CoordMode "Mouse", oldCoordMode
         }
     
-        /**
-         * ControlClicks an object.
-         * If the result object originates from OCR.FromWindow which captured only the client area,
-         * then the result object will contain correct coordinates for the ControlClick. 
-         * Coordinates will be adjusted to Client area from the CoordMode that the OCR happened in.
-         * Otherwise, if additionally a WinTitle is provided then the coordinates are treated as Screen 
-         * coordinates and converted to Client coordinates.
-         * @param WinTitle If WinTitle is set, then the coordinates stored in Obj will be converted to
-         * client coordinates and ControlClicked.
-         */
         ControlClick(WinTitle?, WinText?, WhichButton?, ClickCount?, Options?, ExcludeTitle?, ExcludeText?) {
             local x := this.x, y := this.y, w := this.w, h := this.h, hWnd
             if this.HasProp("Relative") {
@@ -755,7 +493,6 @@ class OCR {
             if this.HasProp("Relative") && this.Relative.HasProp("CoordMode") && (this.Relative.CoordMode = "Client" || this.Relative.CoordMode = "Window") {
                 mode := this.Relative.CoordMode, hWnd := this.Relative.hWnd
                 if mode = "Window" {
-                    ; Window -> Client
                     RECT := Buffer(16, 0), pt := Buffer(8, 0)
                     DllCall("user32\GetWindowRect", "Ptr", hWnd, "Ptr", RECT)
                     winX := NumGet(RECT, 0, "Int"), winY := NumGet(RECT, 4, "Int")
@@ -791,14 +528,6 @@ class OCR {
         }
     }
 
-    /**
-     * Returns an OCR results object for an image file. Locations of the words will be relative to
-     * the top left corner of the image.
-     * @param FileName Either full or relative (to A_WorkingDir) path to the file.
-     * @param lang OCR language. Default is first from available languages.
-     * @param transform Either a scale factor number, or an object {scale:Float, grayscale:Boolean, invertcolors:Boolean, monochrome:0-255, rotate: 0 | 90 | 180 | 270, flip: 0 | "x" | "y"}
-     * @returns {OCR.Result} 
-     */
     static FromFile(FileName, Options:=0) {
         if !(fe := FileExist(FileName)) or InStr(fe, "D")
             throw TargetError("File `"" FileName "`" doesn't exist", -1)
@@ -809,16 +538,6 @@ class OCR {
         return this(IRandomAccessStream, Options)
     }
 
-    /**
-     * Returns an array of OCR results objects for a PDF file. Locations of the words will be relative to
-     * the top left corner of the PDF page.
-     * @param FileName Either full or relative (to A_WorkingDir) path to the file.
-     * @param Options Optional: OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     * @param Start Optional: Page number to start from. Default is first page.
-     * @param End Optional: Page number to end with (included). Default is last page.
-     * @param Password Optional: PDF password.
-     * @returns {OCR.Result} 
-     */
     static FromPDF(FileName, Options:=0, Start:=1, End?, Password:="") {
         this.__ExtractNamedParameters(Options, "lang", &lang, "start", &Start, "end", &End, "password", &Password)
         if !(fe := FileExist(FileName)) or InStr(fe, "D")
@@ -828,7 +547,7 @@ class OCR {
         PdfDocument := this.__OpenPdfDocument(IRandomAccessStream, Password)
         this.CloseIClosable(IRandomAccessStream)
         if !IsSet(End) {
-            ComCall(7, PdfDocument, "uint*", &End:=0) ; GetPageCount
+            ComCall(7, PdfDocument, "uint*", &End:=0)
             if !End
                 throw Error("Unable to get PDF page count", -1)
         }
@@ -842,34 +561,24 @@ class OCR {
         DllCall("ShCore\CreateRandomAccessStreamOnFile", "wstr", FileName, "uint", Read := 0, "ptr", GUID := this.CLSIDFromString(this.IID_IRandomAccessStream), "ptr*", IRandomAccessStream:=ComValue(13,0))
         PdfDocument := this.__OpenPdfDocument(IRandomAccessStream, Password)
         this.CloseIClosable(IRandomAccessStream)
-        ComCall(7, PdfDocument, "uint*", &PageCount:=0) ; GetPageCount
+        ComCall(7, PdfDocument, "uint*", &PageCount:=0)
         if !PageCount
             throw Error("Unable to get PDF page count", -1)
         
         return PageCount
     }
 
-    ; Returns {Width, Height, Rotation, PreferredZoom}
     static GetPdfPageProperties(FileName, Page, Password:="") {
         DllCall("ShCore\CreateRandomAccessStreamOnFile", "wstr", FileName, "uint", Read := 0, "ptr", GUID := this.CLSIDFromString(this.IID_IRandomAccessStream), "ptr*", IRandomAccessStream:=ComValue(13,0))
         PdfDocument := this.__OpenPdfDocument(IRandomAccessStream, Password)
         this.CloseIClosable(IRandomAccessStream)
-        ComCall(6, PdfDocument, "uint", Page-1, "ptr*", PdfPage:=ComValue(13, 0)) ; GetPage
-        ComCall(10, PdfPage, "ptr*", Size:=Buffer(8, 0)) ; Size
+        ComCall(6, PdfDocument, "uint", Page-1, "ptr*", PdfPage:=ComValue(13, 0))
+        ComCall(10, PdfPage, "ptr*", Size:=Buffer(8, 0))
         ComCall(12, PdfPage, "uint*", &Rotation:=0)
         ComCall(12, PdfPage, "float*", &PreferredZoom:=0)
         return {Width: NumGet(Size, 0, "float"), Height: NumGet(size, 4, "float"), Rotation: Rotation*90, PreferredZoom:PreferredZoom}
     }
 
-    /**
-     * Returns an OCR result object for a PDF page. Locations of the words will be relative to
-     * the top left corner of the PDF page.
-     * @param FileName Either full or relative (to A_WorkingDir) path to the file.
-     * @param Page The page number to OCR.
-     * @param Options Optional: OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     * @param Password Optional: PDF password.
-     * @returns {OCR.Result} 
-     */
     static FromPDFPage(FileName, Page, Options:=0, Password:="") {
         local scale := 1, x := 0, y := 0, w := 0, h := 0
         if IsObject(Options)
@@ -883,23 +592,23 @@ class OCR {
             PdfDocument := this.__OpenPdfDocument(IRandomAccessStream, Password)
         } else
             PdfDocument := FileName
-        ComCall(6, PdfDocument, "uint", Page-1, "ptr*", PdfPage:=ComValue(13, 0)) ; GetPage
+        ComCall(6, PdfDocument, "uint", Page-1, "ptr*", PdfPage:=ComValue(13, 0))
         InMemoryRandomAccessStream := this.CreateClass("Windows.Storage.Streams.InMemoryRandomAccessStream")
         PdfPageRenderOptions := this.CreateClass("Windows.Data.Pdf.PdfPageRenderOptions")
-        ComCall(15, PdfPageRenderOptions, "uint", true) ; IsIgnoringHighContrast
+        ComCall(15, PdfPageRenderOptions, "uint", true)
         if x || y || w || h {
             rect := Buffer(16, 0), NumPut("float", x, "float", y, "float", w, "float", h, rect)
-            ComCall(7, PdfPageRenderOptions, "ptr", rect) ; put_SourceRect
+            ComCall(7, PdfPageRenderOptions, "ptr", rect)
             Options.w := Options.w*scale, Options.h := Options.h*scale
             Options.DeleteProp("x"), Options.DeleteProp("y"), Options.DeleteProp("w"), Options.DeleteProp("h")
         }
         if (scale != 1) {
-            ComCall(10, PdfPage, "ptr", Size:=Buffer(8, 0)) ; get_Size
-            ComCall(9, PdfPageRenderOptions, "uint", Floor((w || NumGet(size, 0, "float"))*scale)) ; put_DestinationWidth
-            ComCall(11, PdfPageRenderOptions, "uint", Floor((h || NumGet(size, 4, "float"))*scale)) ; put_DestinationHeight
+            ComCall(10, PdfPage, "ptr", Size:=Buffer(8, 0))
+            ComCall(9, PdfPageRenderOptions, "uint", Floor((w || NumGet(size, 0, "float"))*scale))
+            ComCall(11, PdfPageRenderOptions, "uint", Floor((h || NumGet(size, 4, "float"))*scale))
             Options.DeleteProp("scale")
         }
-        ComCall(7, PdfPage, "ptr", InMemoryRandomAccessStream, "ptr", PdfPageRenderOptions, "ptr*", asyncInfo:=ComValue(13, 0)) ; RenderWithOptionsToStreamAsync
+        ComCall(7, PdfPage, "ptr", InMemoryRandomAccessStream, "ptr", PdfPageRenderOptions, "ptr*", asyncInfo:=ComValue(13, 0))
         this.WaitForAsync(&asyncInfo)
         if FileName is String
             this.CloseIClosable(IRandomAccessStream)
@@ -910,27 +619,6 @@ class OCR {
         return OcrResult
     }
 
-    /**
-     * Returns an OCR results object for a given window. Locations of the words will be relative
-     * using the CoordMode from A_CoordModePixel (default is Client). 
-     * The window from where the image was captured is stored in Result.Relative.hWnd
-     * Additionally, Result.Relative.CoordMode is stored (the A_CoordModePixel at the time of OCR).
-     * @param WinTitle A window title or other criteria identifying the target window.
-     * @param Options Optional: OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     * Additionally for FromWindow the options may include:
-     *      mode:  Different methods of capturing the window. 
-     *        0 = uses GetDC with BitBlt
-     *        1 = same as 0 but window transparency is turned off beforehand with WinSetTransparent
-     *        2 = uses PrintWindow. 
-     *        3 = same as 1 but window transparency is turned off beforehand with WinSetTransparent
-     *        4 = uses PrintWindow with undocumented PW_RENDERFULLCONTENT flag, allowing capture of hardware-accelerated windows
-     *        5 = uses Direct3D11 from UWP Windows.Graphics.Capture (slowest option, but may work with games) 
-     *             This may draw a yellow border around the target window in older Windows versions.
-     * @param WinText Additional window criteria.
-     * @param ExcludeTitle Additional window criteria.
-     * @param ExcludeText Additional window criteria.
-     * @returns {OCR.Result} 
-     */
     static FromWindow(WinTitle:="", Options:=0, WinText:="", ExcludeTitle:="", ExcludeText:="") {
         local result, coordsmode := A_CoordModePixel, onlyClientArea := coordsMode = "Client", mode := 4, X := 0, Y := 0, W := 0, H := 0, sX, sY, hBitMap, hwnd, customRect := 0, transform := 0
         if !Options && Type(WinTitle) = "Object"
@@ -956,35 +644,24 @@ class OCR {
         WinGetPos(&wX, &wY, &wW, &wH, hWnd)
         If onlyClientArea {
             WinGetClientPos(&cX, &cY, &cW, &cH, hWnd)
-            W := W || cW, H := H || cH, sX := X + cX, sY := Y + cY  ; Calculate final X and Y screen coordinates
+            W := W || cW, H := H || cH, sX := X + cX, sY := Y + cY
         } else {
             W := W || wW, H := H || wH, sX := X + wX, sY := Y + wY
         }
 
         if mode = 5 {
-            /*
-                If we are capturing the whole window, then WinGetPos/MouseGetPos might include hidden borders.
-                Eg (0,0) might be (-11, -11) for Direct3D, meaning (11,11) by WinGetPos is (0,0) for Direct3D.
-                These offsets are calculated and stored in offsetX, offsetY, and if only the window
-                area is captured then the result object coordinates are adjusted accordingly.
-
-                If the SoftwareBitmap needs to be transformed in any way (eg scale or custom rect is
-                provided) then we need to offset coordinates and possibly width/height as well.
-
-            */
             SoftwareBitmap := this.CreateDirect3DSoftwareBitmapFromWindow(hWnd)
 
             local sbW := SoftwareBitmap.W, sbH := SoftwareBitmap.H, sbX := SoftwareBitmap.X, sbY := SoftwareBitmap.Y
             local offsetX := 0, offsetY := 0
 
             if transform.scale != 1 || transform.rotate || transform.flip || customRect || onlyClientArea {
-                ; The bounds need to fit inside the SoftwareBitmap bounds, so possibly X,Y need to be adjusted along with W,H
                 local tX := X, tY := Y, tW := W, tH := H
                 if onlyClientArea
                     tX -= SoftwareBitmap.X-cX, tY -= SoftwareBitmap.Y-cY
                 else
                     tX -= SoftwareBitmap.X-wX, tY -= SoftwareBitmap.Y-wY
-                if tX < 0 ; If resulting coordinates are negative then adjust width and height accordingly 
+                if tX < 0
                     tW += tX, offsetX := -tX, tX := 0
                 if tY < 0
                     tH += tY, offsetY := -tY, tY := 0
@@ -1013,14 +690,6 @@ class OCR {
         return result
     }
 
-    /**
-     * Returns an OCR results object for the specified monitor. Locations of the words will be relative to
-     * the primary screen (CoordMode "Screen"), even if a secondary monitor is being captured.
-     * @param Monitor Optional: The monitor from which to get the desktop area. Default is primary monitor.
-     *   If screen scaling between monitors differs, then use DllCall("SetThreadDpiAwarenessContext", "ptr", -3)
-     * @param Options Optional: OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     * @returns {OCR.Result} 
-     */
     static FromMonitor(Monitor?, Options:=0) {
         if !Options && IsSet(Monitor) && IsObject(Monitor)
             Options := Monitor, Monitor := unset
@@ -1029,25 +698,8 @@ class OCR {
         return this.FromRect(Left, Top, Right-Left, Bottom-Top, Options)
     }
 
-    /**
-     * Returns an OCR results object for the whole virtual screen. Locations of the words will be relative to
-     * the primary screen (CoordMode "Screen").
-     * @param Options Optional: OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     *   If screen scaling between monitors differs, then use DllCall("SetThreadDpiAwarenessContext", "ptr", -3)
-     * @returns {OCR.Result}
-     */
     static FromDesktop(Options:=0) => this.FromRect(SysGet(76), SysGet(77), SysGet(78), SysGet(79), Options)
 
-    /**
-     * Returns an OCR results object for a region of the screen. Locations of the words will be relative
-     * to the screen.
-     * @param x Screen x coordinate
-     * @param y Screen y coordinate
-     * @param w Region width. Maximum is OCR.MaxImageDimension; minimum is 40 pixels (source: user FanaticGuru in AutoHotkey forums), smaller images will be scaled to at least 40 pixels.
-     * @param h Region height. Maximum is OCR.MaxImageDimension; minimum is 40 pixels, smaller images will be scaled accordingly.
-     * @param Options OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     * @returns {OCR.Result} 
-     */
     static FromRect(x, y, w, h, Options:=0) {
         local transform := 0, result
         if IsObject(Options)
@@ -1061,15 +713,6 @@ class OCR {
         return this.NormalizeCoordinates(result, scale, x, y)
     }
 
-    /**
-     * Returns an OCR results object from a bitmap. Locations of the words will be relative
-     * to the top left corner of the bitmap.
-     * @param Bitmap A pointer to a GDIP Bitmap object, or HBITMAP, or an object with a ptr property
-     *  set to one of the two.
-     * @param Options OCR options {lang, scale, grayscale, invertcolors, rotate, flip, x, y, w, h, decoder}. 
-     * @param hDC Optional: a device context for the bitmap. If omitted then the screen DC is used.
-     * @returns {OCR.Result} 
-     */
     static FromBitmap(Bitmap, Options:=0, hDC?) {
         local result, pDC, hBitmap, hBM2, oBM, oBM2, pBitmapInfo := Buffer(32, 0), W, H, scale, transform := 0
         if IsObject(Options)
@@ -1081,7 +724,7 @@ class OCR {
         if !DllCall("GetObject", "ptr", Bitmap, "int", pBitmapInfo.Size, "ptr", pBitmapInfo) {
             DllCall("gdiplus\GdipCreateHBITMAPFromBitmap", "UPtr", Bitmap, "UPtr*", &hBitmap:=0, "Int", 0xffffffff)
             DllCall("GetObject", "ptr", hBitmap, "int", pBitmapInfo.Size, "ptr", pBitmapInfo)
-            Bitmap := 0 ; Marks hBitmap to be deleted afterwards
+            Bitmap := 0
         } else
             hBitmap := Bitmap
 
@@ -1095,10 +738,10 @@ class OCR {
             , pDC := DllCall("CreateCompatibleDC", "Ptr", hDC, "Ptr")
             , hBM2 := DllCall("CreateCompatibleBitmap", "Ptr", hDC, "Int", Max(40, sW), "Int", Max(40, sH), "Ptr")
             , oBM2 := DllCall("SelectObject", "Ptr", pDC, "Ptr", hBM2, "Ptr")
-            if sW < 40 || sH < 40 ; Fills the bitmap so it's at least 40x40, which seems to improve recognition
-                DllCall("StretchBlt", "Ptr", pDC, "Int", 0, "Int", 0, "Int", Max(40,sW), "Int", Max(40,sH), "Ptr", hDC, "Int", 0, "Int", 0, "Int", 1, "Int", 1, "UInt", 0x00CC0020 | this.CAPTUREBLT) ; SRCCOPY. 
-            PrevStretchBltMode := DllCall("SetStretchBltMode", "Ptr", PDC, "Int", 3, "Int") ; COLORONCOLOR
-            , DllCall("StretchBlt", "Ptr", pDC, "Int", 0, "Int", 0, "Int", sW, "Int", sH, "Ptr", hDC, "Int", 0, "Int", 0, "Int", W, "Int", H, "UInt", 0x00CC0020 | this.CAPTUREBLT) ; SRCCOPY
+            if sW < 40 || sH < 40
+                DllCall("StretchBlt", "Ptr", pDC, "Int", 0, "Int", 0, "Int", Max(40,sW), "Int", Max(40,sH), "Ptr", hDC, "Int", 0, "Int", 0, "Int", 1, "Int", 1, "UInt", 0x00CC0020 | this.CAPTUREBLT)
+            PrevStretchBltMode := DllCall("SetStretchBltMode", "Ptr", PDC, "Int", 3, "Int")
+            , DllCall("StretchBlt", "Ptr", pDC, "Int", 0, "Int", 0, "Int", sW, "Int", sH, "Ptr", hDC, "Int", 0, "Int", 0, "Int", W, "Int", H, "UInt", 0x00CC0020 | this.CAPTUREBLT)
             , DllCall("SetStretchBltMode", "Ptr", PDC, "Int", PrevStretchBltMode)
             , DllCall("SelectObject", "Ptr", pDC, "Ptr", oBM2)
             , DllCall("SelectObject", "Ptr", hDC, "Ptr", oBM)
@@ -1117,15 +760,11 @@ class OCR {
         return result
     } 
 
-    /**
-     * Returns all available languages as a string, where the languages are separated by newlines.
-     * @returns {String} 
-     */
     static GetAvailableLanguages() {
-        ComCall(7, this.OcrEngineStatics, "ptr*", &LanguageList := 0)   ; AvailableRecognizerLanguages
-        ComCall(7, LanguageList, "int*", &count := 0)   ; count
+        ComCall(7, this.OcrEngineStatics, "ptr*", &LanguageList := 0)
+        ComCall(7, LanguageList, "int*", &count := 0)
         Loop count {
-            ComCall(6, LanguageList, "int", A_Index - 1, "ptr*", &Language := 0)   ; get_Item
+            ComCall(6, LanguageList, "int", A_Index - 1, "ptr*", &Language := 0)
             ComCall(6, Language, "ptr*", &hText := 0)
             buf := DllCall("Combase.dll\WindowsGetStringRawBuffer", "ptr", hText, "uint*", &length := 0, "ptr")
             text .= StrGet(buf, "UTF-16") "`n"
@@ -1136,11 +775,6 @@ class OCR {
         return text
     }
 
-    /**
-     * Loads a new language which will be used with subsequent OCR calls.
-     * @param {string} lang OCR language. Default is first from available languages.
-     * @returns {void} 
-     */
     static LoadLanguage(lang:="FirstFromAvailableLanguages") {
         local hString, Language:=ComValue(13, 0), OcrEngine:=ComValue(13, 0)
         if this.HasOwnProp("CurrentLanguage") && this.HasOwnProp("OcrEngine") && this.CurrentLanguage = lang
@@ -1148,23 +782,18 @@ class OCR {
         if HasMethod(lang)
             lang := lang()
         if (lang = "FirstFromAvailableLanguages")
-            ComCall(10, this.OcrEngineStatics, "ptr*", OcrEngine)   ; TryCreateFromUserProfileLanguages
+            ComCall(10, this.OcrEngineStatics, "ptr*", OcrEngine)
         else {
             hString := this.CreateHString(lang)
-            , ComCall(6, this.LanguageFactory, "ptr", hString, "ptr*", Language)   ; CreateLanguage
+            , ComCall(6, this.LanguageFactory, "ptr", hString, "ptr*", Language)
             , this.DeleteHString(hString)
-            , ComCall(9, this.OcrEngineStatics, "ptr", Language, "ptr*", OcrEngine)   ; TryCreateFromLanguage
+            , ComCall(9, this.OcrEngineStatics, "ptr", Language, "ptr*", OcrEngine)
         }
         if (OcrEngine.ptr = 0)
             Throw Error(lang = "FirstFromAvailableLanguages" ? "Failed to use FirstFromAvailableLanguages for OCR:`nmake sure the primary language pack has OCR capabilities installed.`n`nAlternatively try `"en-us`" as the language." : "Can not use language `"" lang "`" for OCR, please install language pack.")
         this.OcrEngine := OcrEngine, this.CurrentLanguage := lang
     }
 
-    /**
-     * Returns a bounding rectangle {x,y,w,h} for the provided Word objects
-     * @param words Word object arguments (at least 1)
-     * @returns {Object}
-     */
     static WordsBoundingRect(words*) {
         if !words.Length
             throw ValueError("This function requires at least one argument", -1)
@@ -1175,17 +804,6 @@ class OCR {
         return {X:X1, Y:Y1, W:X2-X1, H:Y2-Y1, X2:X2, Y2:Y2}
     }
     
-    /**
-     * Waits text to appear on screen. If the method is successful, then Func's return value is returned.
-     * Otherwise nothing is returned.
-     * @param needle The searched text
-     * @param {number} timeout Timeout in milliseconds. Less than 0 is indefinite wait (default)
-     * @param func The function to be called for the OCR. Default is OCR.FromDesktop
-     * @param casesense Text comparison case-sensitivity
-     * @param comparefunc A custom string compare/search function, that accepts two arguments: haystack and needle.
-     *      Default is InStr. If a custom function is used, then casesense is ignored.
-     * @returns {OCR.Result} 
-     */
     static WaitText(needle, timeout:=-1, func?, casesense:=False, comparefunc?) {
         local endTime := A_TickCount+timeout, result, line, total
         if !IsSet(func)
@@ -1202,25 +820,6 @@ class OCR {
         return
     }
 
-    /**
-     * Returns word clusters using a two-dimensional DBSCAN algorithm
-     * @param objs An array of objects (Words, Lines etc) to cluster. Must have x, y, w, h and Text properties.
-     * @param eps_x Optional epsilon value for x-axis. Default is infinite.
-     * This is unused if compareFunc is provided.
-     * @param eps_y Optional epsilon value for y-axis. Default is median height of objects divided by two.
-     * This is unused if compareFunc is provided.
-     * @param minPts Optional minimum cluster size.
-     * @param compareFunc Optional comparison function to judge the minimum distance between objects
-     * to consider it a cluster. Must accept two objects to compare.
-     * Default comparison function determines whether the difference of middle y-coordinates of 
-     * the objects are less than epsilon-y, and whether objects are less than eps_x apart on the x-axis.
-     * 
-     * Eg `(p1, p2) => ((Abs(p1.y+p1.h-p2.y) < 5 || Abs(p2.y+p2.h-p1.y) < 5) && ((p1.x >= p2.x && p1.x <= (p2.x+p2.w)) || ((p1.x+p1.w) >= p2.x && (p1.x+p1.w) <= (p2.x+p2.w))))`
-     * will cluster objects if they are located on top of eachother on the x-axis, and less than 5 pixels
-     * apart in the y-axis.
-     * @param noise If provided, then will be set to an array of clusters that didn't satisfy minPts
-     * @returns {Array} Array of objects with {x,y,w,h,Text,Words} properties
-     */
     static Cluster(objs, eps_x:=-1, eps_y:=-1, minPts:=1, compareFunc?, &noise?) {
         local clusters := [], start := 0, cluster, word
         visited := Map(), clustered := Map(), C := [], c_n := 0, sum := 0, noise := IsSet(noise) && (noise is Array) ? noise : []
@@ -1240,7 +839,6 @@ class OCR {
             compareFunc := (p1, p2) => Abs(p1.y+p1.h//2-p2.y-p2.h//2)<eps_y && (eps_x < 0 || (Abs(p1.x+p1.w-p2.x)<eps_x || Abs(p1.x-p2.x-p2.w)<eps_x))
         }
 
-        ; DBSCAN adapted from https://github.com/ninopereira/DBSCAN_1D
         for point in objs {
             visited[point] := 1, neighbourPts := [], RegionQuery(point)
             if !clustered.Has(point) {
@@ -1251,7 +849,6 @@ class OCR {
                 noise.Push(C[c_n]), C.RemoveAt(c_n), c_n--
         }
 
-        ; Sort clusters by x-coordinate, get cluster bounding rects, and concatenate word texts
         for cluster in C {
             this.SortArray(cluster,,"x")
             br := this.Common(), br.DefineProp("BoundingRect", {value:this.WordsBoundingRect(cluster*)}), br.DefineProp("Words", {value:cluster}), br.DefineProp("Text", {value: ""})
@@ -1260,7 +857,6 @@ class OCR {
             br.Text := RTrim(br.Text)
             clusters.Push(br)
         }
-        ; Sort clusters/lines by y-coordinate
         this.SortArray(clusters,,"y")
         return clusters
 
@@ -1284,23 +880,6 @@ class OCR {
         }
     }
 
-    /**
-     * Sorts an array in-place, optionally by object keys or using a callback function.
-     * @param arr The array to be sorted
-     * @param OptionsOrCallback Optional: either a callback function, or one of the following:
-     * 
-     *     N => array is considered to consist of only numeric values. This is the default option.
-     *     C, C1 or COn => case-sensitive sort of strings
-     *     C0 or COff => case-insensitive sort of strings
-     * 
-     *     The callback function should accept two parameters elem1 and elem2 and return an integer:
-     *     Return integer < 0 if elem1 less than elem2
-     *     Return 0 is elem1 is equal to elem2
-     *     Return > 0 if elem1 greater than elem2
-     * @param Key Optional: Omit it if you want to sort a array of primitive values (strings, numbers etc).
-     *     If you have an array of objects, specify here the key by which contents the object will be sorted.
-     * @returns {Array}
-     */
     static SortArray(arr, optionsOrCallback:="N", key?) {
         if (arr.Length < 2)
             return this
@@ -1338,7 +917,6 @@ class OCR {
         StringCompare(left, right, casesense := False) => StrCompare(left "", right "", casesense)
         StringCompareKey(key, left, right, casesense := False) => StrCompare((left.HasProp("__Item") ? left[key] : left.%key%) "", (right.HasProp("__Item") ? right[key] : right.%key%) "", casesense)
 
-        ; In-place quicksort (Hoare-style partition with middle pivot)
         QuickSort(left, right) {
             i := left
             j := right
@@ -1360,14 +938,12 @@ class OCR {
                 QuickSort(i, right)
         }
     }
-    ; Reverses the array in-place
     static ReverseArray(arr) {
         local len := arr.Length + 1, max := (len // 2), i := 0
         while ++i <= max
             temp := arr[len - i], arr[len - i] := arr[i], arr[i] := temp
         return arr
     }
-    ; Returns a new array with only unique values
     static UniqueArray(arr) {
         local unique := Map()
         for v in arr
@@ -1375,7 +951,6 @@ class OCR {
         return [unique*]
     }
 
-    ; Returns a one-dimensional array from a multi-dimensional array
     static FlattenArray(arr) {
         local r := []
         for v in arr {
@@ -1387,16 +962,12 @@ class OCR {
         return r
     }
 
-    ;; Only internal methods ahead
 
-    ; Scales and optionally crops a SoftwareBitmap. Crop parameters need to not be scale-adjusted.
-    ; Rotation can be clockwise 0, 90, 180, or 270 degrees
-    ; Flip: 0 = no flip, 1 = around y-axis, 2 = around x-axis
     static TransformSoftwareBitmap(SoftwareBitmap, &sbW, &sbH, scale:=1, rotate:=0, flip:=0, X?, Y?, W?, H?) {
         InMemoryRandomAccessStream := this.SoftwareBitmapToRandomAccessStream(SoftwareBitmap)
 
         ComCall(this.Vtbl_GetDecoder.png, this.BitmapDecoderStatics, "ptr", DecoderGUID:=Buffer(16))
-        ComCall(15, this.BitmapDecoderStatics, "ptr", DecoderGUID, "ptr", InMemoryRandomAccessStream, "ptr*", BitmapDecoder:=ComValue(13,0))   ; CreateAsync
+        ComCall(15, this.BitmapDecoderStatics, "ptr", DecoderGUID, "ptr", InMemoryRandomAccessStream, "ptr*", BitmapDecoder:=ComValue(13,0))
         this.WaitForAsync(&BitmapDecoder)
 
         BitmapFrameWithSoftwareBitmap := ComObjQuery(BitmapDecoder, IBitmapFrameWithSoftwareBitmap := "{FE287C9A-420C-4963-87AD-691436E08383}")
@@ -1410,28 +981,26 @@ class OCR {
             sbH := Min(sbH, H)
         local sW := Floor(sbW*scale), sH := Floor(sbH*scale), intermediate
         if scale != 1 {
-            ; First the bitmap is scaled, then cropped
-            ComCall(7, BitmapTransform, "uint", sW) ; put_ScaledWidth
-            ComCall(9, BitmapTransform, "uint", sH) ; put_ScaledHeight
+            ComCall(7, BitmapTransform, "uint", sW)
+            ComCall(9, BitmapTransform, "uint", sH)
         }
         if rotate {
-            ComCall(15, BitmapTransform, "uint", rotate//90) ; put_Rotation
+            ComCall(15, BitmapTransform, "uint", rotate//90)
             if rotate = 90 || rotate = 270
                 intermediate := sW, sW := sH, sH := intermediate
         }
         if flip
-            ComCall(13, BitmapTransform, "uint", flip) ; put_Flip
+            ComCall(13, BitmapTransform, "uint", flip)
 
         if (IsSet(X) && X != 0) || (IsSet(Y) && Y != 0) || IsSet(W) || IsSet(H)  {
             bounds := Buffer(16,0), NumPut("int", Floor(X*scale), "int", Floor(Y*scale), "int", Floor(sbW*scale), "int", Floor(sbH*scale), bounds)
-            ComCall(17, BitmapTransform, "ptr", bounds) ; put_Bounds
+            ComCall(17, BitmapTransform, "ptr", bounds)
         }
-        ComCall(8, BitmapFrame, "uint*", &BitmapPixelFormat:=0) ; get_BitmapPixelFormat
-        ComCall(9, BitmapFrame, "uint*", &BitmapAlphaMode:=0) ; get_BitmapAlphaMode
-        ComCall(8, BitmapFrameWithSoftwareBitmap, "uint", BitmapPixelFormat, "uint", BitmapAlphaMode, "ptr", BitmapTransform, "uint", IgnoreExifOrientation := 0, "uint", DoNotColorManage := 0, "ptr*", SoftwareBitmap:=ComValue(13,0)) ; GetSoftwareBitmapTransformedAsync
+        ComCall(8, BitmapFrame, "uint*", &BitmapPixelFormat:=0)
+        ComCall(9, BitmapFrame, "uint*", &BitmapAlphaMode:=0)
+        ComCall(8, BitmapFrameWithSoftwareBitmap, "uint", BitmapPixelFormat, "uint", BitmapAlphaMode, "ptr", BitmapTransform, "uint", IgnoreExifOrientation := 0, "uint", DoNotColorManage := 0, "ptr*", SoftwareBitmap:=ComValue(13,0))
 
         this.WaitForAsync(&SoftwareBitmap)
-        ; this.CloseIClosable(BitmapFrameWithSoftwareBitmap) ; Implemented, but is it necessary?
         this.CloseIClosable(InMemoryRandomAccessStream)
         sbW := sW, sbH := sH
         return SoftwareBitmap
@@ -1447,20 +1016,6 @@ class OCR {
         return hbm
     }
 
-    /**
-     * Creates an hBitmap of a region of the screen or a specific window
-     * @param X Captured rectangle X coordinate. This is relative to the screen unless hWnd is specified,
-     *  in which case it may be relative to the window/client
-     * @param Y Captured rectangle Y coordinate.
-     * @param W Captured rectangle width.
-     * @param H Captured rectangle height.
-     * @param {Integer|Object} hWnd Window handle which to capture. Coordinates will be relative to the window. 
-     *  hWnd may also be an object {hWnd, onlyClientArea, mode} where onlyClientArea:1 means the client area will be captured instead of the whole window (and X, Y will also be relative to client)
-     *  mode 0 uses GetDC + StretchBlt, mode 1 uses PrintWindow, mode 2 uses PrintWindow with undocumented PW_RENDERFULLCONTENT flag. 
-     *  Default is mode 2.
-     * @param {Integer} scale 
-     * @returns {OCR.IBase} 
-     */
     static CreateHBitmap(X, Y, W, H, hWnd:=0, scale:=1) {
         local sW := Ceil(W*scale), sH := Ceil(H*scale), onlyClientArea := 0, mode := 2, HDC, obm, hbm, pdc, hbm2
         if hWnd {
@@ -1476,8 +1031,8 @@ class OCR {
                     PDC2 := DllCall("CreateCompatibleDC", "Ptr", PDC, "Ptr")
                     , HBM2 := DllCall("CreateCompatibleBitmap", "Ptr", PDC, "Int", Max(40,sW), "Int", Max(40,sH), "Ptr")
                     , OBM2 := DllCall("SelectObject", "Ptr", PDC2, "Ptr", HBM2, "Ptr")
-                    , PrevStretchBltMode := DllCall("SetStretchBltMode", "Ptr", PDC, "Int", 3, "Int") ; COLORONCOLOR
-                    , DllCall("StretchBlt", "Ptr", PDC2, "Int", 0, "Int", 0, "Int", sW, "Int", sH, "Ptr", PDC, "Int", X, "Int", Y, "Int", W, "Int", H, "UInt", 0x00CC0020 | this.CAPTUREBLT) ; SRCCOPY
+                    , PrevStretchBltMode := DllCall("SetStretchBltMode", "Ptr", PDC, "Int", 3, "Int")
+                    , DllCall("StretchBlt", "Ptr", PDC2, "Int", 0, "Int", 0, "Int", sW, "Int", sH, "Ptr", PDC, "Int", X, "Int", Y, "Int", W, "Int", H, "UInt", 0x00CC0020 | this.CAPTUREBLT)
                     , DllCall("SetStretchBltMode", "Ptr", PDC, "Int", PrevStretchBltMode)
                     , DllCall("SelectObject", "Ptr", PDC2, "Ptr", obm2)
                     , DllCall("DeleteDC", "Ptr", PDC)
@@ -1495,10 +1050,10 @@ class OCR {
         PDC := DllCall("CreateCompatibleDC", "Ptr", HDC, "Ptr")
         , HBM := DllCall("CreateCompatibleBitmap", "Ptr", HDC, "Int", Max(40,sW), "Int", Max(40,sH), "Ptr")
         , OBM := DllCall("SelectObject", "Ptr", PDC, "Ptr", HBM, "Ptr")
-        if sW < 40 || sH < 40 ; Fills the bitmap so it's at least 40x40, which seems to improve recognition
-            DllCall("StretchBlt", "Ptr", PDC, "Int", 0, "Int", 0, "Int", Max(40,sW), "Int", Max(40,sH), "Ptr", HDC, "Int", X, "Int", Y, "Int", 1, "Int", 1, "UInt", 0x00CC0020 | this.CAPTUREBLT) ; SRCCOPY. 
-        PrevStretchBltMode := DllCall("SetStretchBltMode", "Ptr", PDC, "Int", 3, "Int") ; COLORONCOLOR
-        , DllCall("StretchBlt", "Ptr", PDC, "Int", 0, "Int", 0, "Int", sW, "Int", sH, "Ptr", HDC, "Int", X, "Int", Y, "Int", W, "Int", H, "UInt", 0x00CC0020 | this.CAPTUREBLT) ; SRCCOPY
+        if sW < 40 || sH < 40
+            DllCall("StretchBlt", "Ptr", PDC, "Int", 0, "Int", 0, "Int", Max(40,sW), "Int", Max(40,sH), "Ptr", HDC, "Int", X, "Int", Y, "Int", 1, "Int", 1, "UInt", 0x00CC0020 | this.CAPTUREBLT)
+        PrevStretchBltMode := DllCall("SetStretchBltMode", "Ptr", PDC, "Int", 3, "Int")
+        , DllCall("StretchBlt", "Ptr", PDC, "Int", 0, "Int", 0, "Int", sW, "Int", sH, "Ptr", HDC, "Int", X, "Int", Y, "Int", W, "Int", H, "UInt", 0x00CC0020 | this.CAPTUREBLT)
         , DllCall("SetStretchBltMode", "Ptr", PDC, "Int", PrevStretchBltMode)
         , DllCall("SelectObject", "Ptr", PDC, "Ptr", OBM)
         , DllCall("DeleteDC", "Ptr", HDC)
@@ -1524,33 +1079,32 @@ class OCR {
             DllCall("ole32\CLSIDFromString", "wstr", IGraphicsCaptureItem := "{79c3f95b-31f7-4ec2-a464-632ef5d30760}", "ptr", GraphicsCaptureItemGUID)
             init := 1
         }
-        ; INIT done
 
         DllCall("Dwmapi.dll\DwmGetWindowAttribute", "ptr", hWnd, "uint", DWMWA_EXTENDED_FRAME_BOUNDS := 9, "ptr", rect := Buffer(16,0), "uint", 16)
         x := NumGet(rect, 0, "int"), y := NumGet(rect, 4, "int"), w := NumGet(rect, 8, "int") - x, h := NumGet(rect, 12, "int") - y
-        ComCall(6, Direct3D11CaptureFramePoolStatics, "ptr", Direct3DDevice, "int", B8G8R8A8UIntNormalized := 87, "int", numberOfBuffers := 2, "int64", (h << 32) | w, "ptr*", Direct3D11CaptureFramePool:=ComValue(13, 0))   ; Direct3D11CaptureFramePool.Create
-        if ComCall(3, GraphicsCaptureItemInterop, "ptr", hWnd, "ptr", GraphicsCaptureItemGUID, "ptr*", GraphicsCaptureItem:=ComValue(13, 0), "uint") {   ; IGraphicsCaptureItemInterop::CreateForWindow
+        ComCall(6, Direct3D11CaptureFramePoolStatics, "ptr", Direct3DDevice, "int", B8G8R8A8UIntNormalized := 87, "int", numberOfBuffers := 2, "int64", (h << 32) | w, "ptr*", Direct3D11CaptureFramePool:=ComValue(13, 0))
+        if ComCall(3, GraphicsCaptureItemInterop, "ptr", hWnd, "ptr", GraphicsCaptureItemGUID, "ptr*", GraphicsCaptureItem:=ComValue(13, 0), "uint") {
             this.CloseIClosable(Direct3D11CaptureFramePool)
             throw Error("Failed to capture GraphicsItem of window",, -1)
         }
-        ComCall(10, Direct3D11CaptureFramePool, "ptr", GraphicsCaptureItem, "ptr*", GraphicsCaptureSession:=ComValue(13, 0))   ; Direct3D11CaptureFramePool.CreateCaptureSession
+        ComCall(10, Direct3D11CaptureFramePool, "ptr", GraphicsCaptureItem, "ptr*", GraphicsCaptureSession:=ComValue(13, 0))
 
         GraphicsCaptureSession2 := ComObjQuery(GraphicsCaptureSession, IGraphicsCaptureSession2 := "{2c39ae40-7d2e-5044-804e-8b6799d4cf9e}")
-        ComCall(7, GraphicsCaptureSession2, "int", 0)   ; GraphicsCaptureSession.IsCursorCaptureEnabled put
+        ComCall(7, GraphicsCaptureSession2, "int", 0)
 
-        if (Integer(StrSplit(A_OSVersion, ".")[3]) >= 20348) { ; hide border
+        if (Integer(StrSplit(A_OSVersion, ".")[3]) >= 20348) {
             GraphicsCaptureSession3 := ComObjQuery(GraphicsCaptureSession, IGraphicsCaptureSession3 := "{f2cdd966-22ae-5ea1-9596-3a289344c3be}")
-            ComCall(7, GraphicsCaptureSession3, "int", 0)   ; GraphicsCaptureSession.IsBorderRequired put
+            ComCall(7, GraphicsCaptureSession3, "int", 0)
         }
-        ComCall(6, GraphicsCaptureSession)   ; GraphicsCaptureSession.StartCapture
+        ComCall(6, GraphicsCaptureSession)
         Loop {
-            ComCall(7, Direct3D11CaptureFramePool, "ptr*", Direct3D11CaptureFrame:=ComValue(13, 0))   ; Direct3D11CaptureFramePool.TryGetNextFrame
+            ComCall(7, Direct3D11CaptureFramePool, "ptr*", Direct3D11CaptureFrame:=ComValue(13, 0))
             if (Direct3D11CaptureFrame.ptr != 0)
                 break
         }
-        ComCall(6, Direct3D11CaptureFrame, "ptr*", Direct3DSurface:=ComValue(13, 0))   ; Direct3D11CaptureFrame.Surface
+        ComCall(6, Direct3D11CaptureFrame, "ptr*", Direct3DSurface:=ComValue(13, 0))
 
-        ComCall(11, this.SoftwareBitmapStatics, "ptr", Direct3DSurface, "ptr*", SoftwareBitmap:=ComValue(13, 0)) ; SoftwareBitmap::CreateCopyFromSurfaceAsync
+        ComCall(11, this.SoftwareBitmapStatics, "ptr", Direct3DSurface, "ptr*", SoftwareBitmap:=ComValue(13, 0))
         this.WaitForAsync(&SoftwareBitmap)
 
         this.CloseIClosable(Direct3D11CaptureFramePool)
@@ -1579,14 +1133,12 @@ class OCR {
         , NumPut("uint", sz, "uint", PICTYPE_BITMAP, "ptr", IsInteger(hBitmap) ? hBitmap : hBitmap.ptr, PICTDESC)
         , riid := this.CLSIDFromString(this.IID_IPicture)
         , DllCall("OleAut32\OleCreatePictureIndirect", "Ptr", PICTDESC, "Ptr", riid, "UInt", 0, "Ptr*", pIPicture:=ComValue(13,0), "UInt")
-        , ComCall(15, pIPicture, "Ptr", pIStream, "UInt", true, "uint*", &size:=0, "UInt") ; IPicture::SaveAsFile
+        , ComCall(15, pIPicture, "Ptr", pIStream, "UInt", true, "uint*", &size:=0, "UInt")
         , riid := this.CLSIDFromString(this.IID_IRandomAccessStream)
         , DllCall("ShCore\CreateRandomAccessStreamOverStream", "Ptr", pIStream, "UInt", BSOS_DEFAULT, "Ptr", riid, "Ptr*", pIRandomAccessStream:=ComValue(13, 0), "UInt")
         Return pIRandomAccessStream
     }
 
-    ; Converts HBITMAP to SoftwareBitmap. NOTE: SetStretchBltMode HALFTONE breaks this
-    ; The optional transform parameter may contain {grayscale, invertcolors}
     static HBitmapToSoftwareBitmap(hBitmap, hDC?, transform?) {
         local bi := Buffer(40, 0), W, H, BitmapBuffer, MemoryBuffer, MemoryBufferReference, BufferByteAccess, BufferSize
         hDC := (hBitmap is OCR.IBase ? hBitmap.DC : (hDC ?? dhDC := DllCall("GetDC", "Ptr", 0, "UPtr")))
@@ -1595,14 +1147,14 @@ class OCR {
         DllCall("GetDIBits", "ptr", hDC, "ptr", hBitmap, "uint", 0, "uint", 0, "ptr", 0, "ptr", bi, "uint", 0)
         W := NumGet(bi, 4, "int"), H := NumGet(bi, 8, "int")
 
-        ComCall(7, this.SoftwareBitmapFactory, "int", 87, "int", W, "int", H, "int", 0, "ptr*", SoftwareBitmap := ComValue(13,0)) ; CreateWithAlpha: Bgra8 & Premultiplied
-        ComCall(15, SoftwareBitmap, "int", 2, "ptr*", &BitmapBuffer := 0) ; LockBuffer
+        ComCall(7, this.SoftwareBitmapFactory, "int", 87, "int", W, "int", H, "int", 0, "ptr*", SoftwareBitmap := ComValue(13,0))
+        ComCall(15, SoftwareBitmap, "int", 2, "ptr*", &BitmapBuffer := 0)
         MemoryBuffer := ComObjQuery(BitmapBuffer, "{fbc4dd2a-245b-11e4-af98-689423260cf8}")
-        ComCall(6, MemoryBuffer, "ptr*", &MemoryBufferReference := 0) ; CreateReference
+        ComCall(6, MemoryBuffer, "ptr*", &MemoryBufferReference := 0)
         BufferByteAccess := ComObjQuery(MemoryBufferReference, "{5b0d3235-4dba-4d44-865e-8f1d0e4fd04d}")
-        ComCall(3, BufferByteAccess, "ptr*", &SoftwareBitmapByteBuffer:=0, "uint*", &BufferSize:=0) ; GetBuffer
+        ComCall(3, BufferByteAccess, "ptr*", &SoftwareBitmapByteBuffer:=0, "uint*", &BufferSize:=0)
 
-        NumPut("short", 32, "short", 0, bi, 14), NumPut("int", -H, bi, 8) ; Negative height to get correctly oriented image
+        NumPut("short", 32, "short", 0, bi, 14), NumPut("int", -H, bi, 8)
         DllCall("GetDIBits", "ptr", hDC, "ptr", hBitmap, "uint", 0, "uint", H, "ptr", SoftwareBitmapByteBuffer, "ptr", bi, "uint", 0)
         if IsSet(transform) {
             if (transform.HasProp("grayscale") && transform.grayscale)
@@ -1619,7 +1171,7 @@ class OCR {
             BufferByteAccess.Dispose()
         if MemoryBuffer.HasMethod("Dispose")
             MemoryBuffer.Dispose()
-        BufferByteAccess := "", ObjRelease(MemoryBufferReference), MemoryBuffer := "", ObjRelease(BitmapBuffer) ; Release in correct order
+        BufferByteAccess := "", ObjRelease(MemoryBufferReference), MemoryBuffer := "", ObjRelease(BitmapBuffer)
 
         return SoftwareBitmap
     }
@@ -1649,14 +1201,14 @@ class OCR {
 
     static SoftwareBitmapToRandomAccessStream(SoftwareBitmap) {
         InMemoryRandomAccessStream := this.CreateClass("Windows.Storage.Streams.InMemoryRandomAccessStream")
-        ComCall(8, this.BitmapEncoderStatics, "ptr", encoderId := Buffer(16, 0)) ; IBitmapEncoderStatics::PngEncoderId
-        ComCall(13, this.BitmapEncoderStatics, "ptr", encoderId, "ptr", InMemoryRandomAccessStream, "ptr*", BitmapEncoder:=ComValue(13,0)) ; IBitmapEncoderStatics::CreateAsync
+        ComCall(8, this.BitmapEncoderStatics, "ptr", encoderId := Buffer(16, 0))
+        ComCall(13, this.BitmapEncoderStatics, "ptr", encoderId, "ptr", InMemoryRandomAccessStream, "ptr*", BitmapEncoder:=ComValue(13,0))
         this.WaitForAsync(&BitmapEncoder)
         BitmapEncoderWithSoftwareBitmap := ComObjQuery(BitmapEncoder, "{686cd241-4330-4c77-ace4-0334968b1768}")
-        ComCall(6, BitmapEncoderWithSoftwareBitmap, "ptr", SoftwareBitmap) ; SetSoftwareBitmap
-        ComCall(19, BitmapEncoder, "ptr*", asyncAction:=ComValue(13,0)) ; FlushAsync
+        ComCall(6, BitmapEncoderWithSoftwareBitmap, "ptr", SoftwareBitmap)
+        ComCall(19, BitmapEncoder, "ptr*", asyncAction:=ComValue(13,0))
         this.WaitForAsync(&asyncAction)
-        ComCall(11, InMemoryRandomAccessStream, "int64", 0) ; Seek to beginning
+        ComCall(11, InMemoryRandomAccessStream, "int64", 0)
         return InMemoryRandomAccessStream
     }
 
@@ -1687,24 +1239,24 @@ class OCR {
     static WaitForAsync(&obj) {
         local AsyncInfo := ComObjQuery(obj, this.IID_IAsyncInfo), status, ErrorCode
         Loop {
-            ComCall(7, AsyncInfo, "uint*", &status:=0)   ; IAsyncInfo.Status
+            ComCall(7, AsyncInfo, "uint*", &status:=0)
             if (status != 0) {
                 if (status != 1) {
-                    ComCall(8, ASyncInfo, "uint*", &ErrorCode:=0)   ; IAsyncInfo.ErrorCode
+                    ComCall(8, ASyncInfo, "uint*", &ErrorCode:=0)
                     throw Error("AsyncInfo failed with status error " ErrorCode, -1)
                 }
                 break
             }
             Sleep this.PerformanceMode ? -1 : 0
         }
-        ComCall(8, obj, "ptr*", ObjectResult:=this.IBase())   ; GetResults
+        ComCall(8, obj, "ptr*", ObjectResult:=this.IBase())
         obj := ObjectResult
     }
 
     static CloseIClosable(pClosable) {
         static IClosable := "{30D5A829-7FA4-4026-83BB-D75BAE4EA99E}"
         local Close := ComObjQuery(pClosable, IClosable)
-        ComCall(6, Close)   ; Close
+        ComCall(6, Close)
     }
 
     static CLSIDFromString(IID) {
@@ -1725,7 +1277,7 @@ class OCR {
     
     static __OpenPdfDocument(IRandomAccessStream, Password:="") {
         PdfDocumentStatics := this.CreateClass("Windows.Data.Pdf.PdfDocument", this.IID_IPdfDocumentStatics)
-        ComCall(8, PdfDocumentStatics, "ptr", IRandomAccessStream, "ptr*", PdfDocument:=ComValue(13, 0)) ; LoadFromStreamAsync
+        ComCall(8, PdfDocumentStatics, "ptr", IRandomAccessStream, "ptr*", PdfDocument:=ComValue(13, 0))
         this.WaitForAsync(&PdfDocument)
         return PdfDocument
     }
@@ -1763,19 +1315,6 @@ class OCR {
                 obj.DeleteProp(prop)
     }
 
-    /**
-     * Converts coordinates between screen, window and client.
-     * @param X X-coordinate to convert
-     * @param Y Y-coordinate to convert
-     * @param outX Variable where to store the converted X-coordinate
-     * @param outY Variable where to store the converted Y-coordinate
-     * @param relativeFrom CoordMode where to convert from. Default is A_CoordModeMouse.
-     * @param relativeTo CoordMode where to convert to. Default is Screen.
-     * @param winTitle A window title or other criteria identifying the target window. 
-     * @param winText If present, this parameter must be a substring from a single text element of the target window.
-     * @param excludeTitle Windows whose titles include this value will not be considered.
-     * @param excludeText Windows whose text include this value will not be considered.
-     */
     static ConvertWinPos(X, Y, &outX, &outY, relativeFrom:="", relativeTo:="screen", winTitle?, winText?, excludeTitle?, excludeText?) {
         relativeFrom := relativeFrom || A_CoordModeMouse
         if relativeFrom = relativeTo {
@@ -1790,27 +1329,23 @@ class OCR {
                     DllCall("user32\GetWindowRect", "Int", hWnd, "Ptr", RECT := Buffer(16))
                     outX := X-NumGet(RECT, 0, "Int"), outY := Y-NumGet(RECT, 4, "Int")
                 } else { 
-                    ; screen to client
                     pt := Buffer(8), NumPut("int",X,pt), NumPut("int",Y,pt,4)
                     DllCall("ScreenToClient", "Int", hWnd, "Ptr", pt)
                     outX := NumGet(pt,0,"int"), outY := NumGet(pt,4,"int")
                 }
             case "window", "w":
-                ; window to screen
                 WinGetPos(&outX, &outY,,,hWnd)
                 outX += X, outY += Y
                 if relativeTo = "client" || relativeTo = "c" {
-                    ; screen to client
                     pt := Buffer(8), NumPut("int",outX,pt), NumPut("int",outY,pt,4)
                     DllCall("ScreenToClient", "Int", hWnd, "Ptr", pt)
                     outX := NumGet(pt,0,"int"), outY := NumGet(pt,4,"int")
                 }
             case "client", "c":
-                ; client to screen
                 pt := Buffer(8), NumPut("int",X,pt), NumPut("int",Y,pt,4)
                 DllCall("ClientToScreen", "Int", hWnd, "Ptr", pt)
                 outX := NumGet(pt,0,"int"), outY := NumGet(pt,4,"int")
-                if relativeTo = "window" || relativeTo = "w" { ; screen to window
+                if relativeTo = "window" || relativeTo = "w" {
                     DllCall("user32\GetWindowRect", "Int", hWnd, "Ptr", RECT := Buffer(16))
                     outX -= NumGet(RECT, 0, "Int"), outY -= NumGet(RECT, 4, "Int")
                 }

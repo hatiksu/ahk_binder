@@ -30,12 +30,13 @@ SetKeyDelay 25, 25
 #Include lib\ReportDetector.ahk
 #Include lib\ReportOverlay.ahk
 #Include lib\GameWindow.ahk
+#Include lib\EntryCommands.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.9.1'
+        this.version := '0.10.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -59,6 +60,7 @@ class Binder extends BinderView {
                 FileCopy A_ScriptDir '\configs\' gender '.txt', this.dir '\' gender '.txt'
         }
         this.Load()
+        this.entry := EntryCommands(this)
         this.Build()
         this.Activate()
         if FileExist(A_ScriptDir '\assets\Binder.ico')
@@ -183,6 +185,10 @@ class Binder extends BinderView {
     }
 
     StoreTrigger(item, key, text) {
+        if key = this.entry.trigger {
+            DarkDialog.Message 'Этот триггер занят командами при входе.'
+            return false
+        }
         if InStr(key, ':') || RegExMatch(key, '\s') {
             DarkDialog.Message 'В триггере нельзя использовать пробелы и двоеточия.'
             return false
@@ -273,6 +279,10 @@ class Binder extends BinderView {
     }
 
     StoreBind(index, key, text) {
+        if key != '' && key = this.entry.key {
+            DarkDialog.Message 'Эта клавиша занята командами при входе.'
+            return false
+        }
         for n, item in this.binds {
             if n != index && item.key = key {
                 DarkDialog.Message 'Это сочетание уже занято.'
@@ -336,7 +346,6 @@ class Binder extends BinderView {
             Hotstring name, , 'Off'
         this.registered := [], failures := []
         for item in this.config.entries {
-            ; Only matching options are used; bodies are always data, never AHK code.
             options := '?XO'
             if InStr(item.options, '*')
                 options .= '*'
@@ -361,6 +370,7 @@ class Binder extends BinderView {
         HotIf
         this.config.problems.Push(failures*)
         this.BindOverlayKeys()
+        this.entry.Register()
     }
 
     TriggerAllowed(*) {
@@ -511,7 +521,6 @@ RunChecks() {
     checkData := A_ScriptDir '\work\check-data-' DllCall('GetCurrentProcessId', 'uint')
     DirCreate checkData
     IniWrite 37, checkData '\settings.ini', 'Reports', 'Norm'
-    ; Instantiate controls and register handlers without showing a window or sending input.
     app := Binder()
     if app.normWeekday != 37 || app.normWeekend != 37
         throw Error('Не перенесена старая дневная норма')
@@ -660,6 +669,40 @@ RunChecks() {
     CheckClick(app.espButtons[2])
     if app.PrepareCommands('/esp 3') != '/esp 2'
         throw Error('Не работает выбор /esp')
+    app.ShowPage('Команды при входе')
+    if app.currentPage != 'Команды при входе' || app.entry.buttons.Count != 9
+        throw Error('Не открывается список команд при входе')
+    for command in EntryCommands.commands {
+        if !app.entry.selected[command]
+            app.entry.Toggle(command)
+    }
+    app.SetFaction('FIB')
+    for n in [1, 2, 3] {
+        app.entry.ChooseESP(n)
+        queue := app.entry.Queue()
+        if queue.Length != 9 || queue[4] != '/esp ' n || queue[5] != '/templeader 7'
+            throw Error('Неверный порядок или параметры очереди команд')
+    }
+    app.faction := 'Все'
+    rejected := false
+    try app.entry.Queue()
+    catch ValueError
+        rejected := true
+    if !rejected
+        throw Error('Темплидерка запускается без выбранной фракции')
+    app.SetFaction('FIB')
+    app.entry.triggerField.Value := '.entry_test'
+    app.entry.keyField.Value := 'F9'
+    app.entry.Save()
+    reloadedEntry := EntryCommands(app)
+    if reloadedEntry.trigger != '.entry_test' || reloadedEntry.key != 'F9' || !reloadedEntry.selected['/netstat']
+        throw Error('Набор команд не сохранился после перезапуска')
+    app.entry.Toggle('/netstat')
+    if app.entry.Queue().Length != 8
+        throw Error('Выключенная команда осталась в очереди')
+    if app.entry.Conflict('F9', '/tl') = ''
+        throw Error('Конфликт с существующим триггером не обнаружен')
+    FileAppend 'OK: entry command queue, ESP modes, factions, persistence and conflicts`n', '*'
     app.ShowPage('Бинды клавиш')
     CheckClickText(app, 'Бинды клавиш', '+ Добавить бинд')
     app.editorFields.key.control.GetPos(&editorX, &editorY)
@@ -921,7 +964,6 @@ RunNavigationProfile(app) {
     NavigationProfile(app)
 }
 
-; Измеряем путь через очередь Windows и обработчик Click, а не прямой ShowPage.
 class NavigationProfile {
     __New(app) {
         this.app := app

@@ -15,8 +15,6 @@ class ReportCounter {
     static Accept(app, id, date) {
         if !RegExMatch(id, '^\d{6,12}$') || !RegExMatch(date, '^\d{14}$') || app.autoClosed.Has(id)
             return false
-        ; Одна запись одновременно хранит факт подсчёта и дату. После сбоя
-        ; итог восстанавливается из журнала без потери и повторного прибавления.
         IniWrite date, app.reportIni, 'AutoClosed', id
         app.autoClosed[id] := date
         day := SubStr(date, 1, 8)

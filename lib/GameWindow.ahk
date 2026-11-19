@@ -7,7 +7,6 @@ class GameWindow {
         this.hwnd := 0, this.pid := 0
     }
     static Matches(title, className) {
-        ; Окно GTA: https://github.com/citizenfx/fivem/blob/master/code/components/rage-graphics-five/src/RenderHooks.cpp
         return className = 'grcWindow' && RegExMatch(title, 'i)(Grand Theft Auto V\b|GTA ?(?:V|5)\b|RAGE Multiplayer|Majestic)') && !RegExMatch(title, 'i)launcher')
     }
     Active() {

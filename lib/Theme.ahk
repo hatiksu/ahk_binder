@@ -1,5 +1,3 @@
-; Настоящие кнопки Windows: системная обработка кликов и клавиатуры,
-; собственная отрисовка без светлых системных элементов.
 class Theme {
     static items := Map()
     static proc := 0
@@ -52,8 +50,6 @@ class Theme {
     }
 
     static Subclass(hwnd, msg, wp, lp, id, data) {
-        ; Сообщения приходят и во время обработки других событий GUI.
-        ; Отдельный контекст не меняет состояние прерванного обработчика.
         Critical 100
         if !this.items.Has(hwnd)
             return DllCall('comctl32\DefSubclassProc', 'ptr', hwnd, 'uint', msg, 'uptr', wp, 'ptr', lp, 'ptr')
@@ -209,7 +205,6 @@ class Theme {
     }
 
     static List(c, columns) {
-        ; Убираем сетку и задаём свободную высоту строк.
         SendMessage 0x1036, 1, 0, c
         images := DllCall('comctl32\ImageList_Create', 'int', 1, 'int', Round(36 * A_ScreenDPI / 96), 'uint', 0x20, 'int', 1, 'int', 1, 'ptr')
         c.SetImageList(images, 1)
@@ -231,13 +226,10 @@ class Theme {
         if stage = 1 {
             dc := NumGet(notification, A_PtrSize = 8 ? 32 : 16, 'ptr')
             this.PaintList(c, dc)
-            ; Explorer рисует разделители даже без LVS_EX_GRIDLINES.
-            ; Отрисовываем содержимое целиком; выбор и прокрутка остаются системными.
             return 4
         }
     }
 
-    ; Прямое чтение ListView не запускает очередь событий AHK внутри отрисовки.
     static ListMessage(c, message, wp := 0, lp := 0) {
         return DllCall('SendMessageW', 'ptr', c.Hwnd, 'uint', message, 'uptr', wp, 'ptr', lp, 'ptr')
     }

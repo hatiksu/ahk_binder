@@ -54,7 +54,6 @@ while ProcessExist(parent) {
         continue
     }
     started := A_TickCount
-    ; Область правой панели с заголовком, кнопкой и подтверждением закрытия.
     result := OCR.FromRect(x + Round(w * .58), y + Round(h * .07), Round(w * .42), Round(h * .20), {lang: 'ru-RU', scale: 1.5, monochrome: 180, invertcolors: true})
     if WinExist('A') != hwnd || A_TickCount - started > 800 {
         detector.Reset()

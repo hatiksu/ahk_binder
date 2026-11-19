@@ -1,4 +1,3 @@
-; Прозрачный HUD: только текст, тень и тонкая шкала, без фоновой карточки.
 class ReportOverlay {
     __New(app, x, y) {
         this.app := app
@@ -21,7 +20,6 @@ class ReportOverlay {
         this.percent := this.Label(this.width - 65, barY - 7, 65, '', 9, 'E3D9FF', 20)
         this.Update(app.ReportCounts())
         if app.overlayMoving {
-            ; В режиме перемещения есть фон для удобного захвата мышью.
             g.BackColor := '202023'
             for control in g {
                 if control.Type = 'Text'
@@ -31,7 +29,6 @@ class ReportOverlay {
             g.Opt('+E0x20')
         if x < -3000 || x > A_ScreenWidth || y < -3000 || y > A_ScreenHeight
             x := 40, y := 60
-        ; Сначала задаём прозрачность скрытому окну: фон не мелькает при показе.
         if !app.overlayMoving
             WinSetTransColor '010203', g
         g.Show((A_Args.Length && A_Args[1] = '--check' ? 'Hide ' : 'NoActivate ') 'w' this.width ' h' this.height ' x' x ' y' y)

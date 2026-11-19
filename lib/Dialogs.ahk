@@ -1,4 +1,3 @@
-; Общие тёмные диалоги: сообщения, подтверждения, ввод и выбор файлов.
 class DarkDialog {
     static last := 0
 
@@ -41,7 +40,6 @@ class DarkDialog {
         frame.close.OnEvent('Click', Close)
         frame.gui.OnEvent('Close', Close)
         frame.gui.OnEvent('Escape', Close)
-        ; Явная точка начала содержимого, чтобы оно не наследовало X кнопки закрытия.
         frame.gui.AddText('x24 y56 w1 h1 Hidden', '')
         return frame.gui
         Close(*) {

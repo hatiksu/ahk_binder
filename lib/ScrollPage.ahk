@@ -1,4 +1,3 @@
-; Прокручиваемая область с собственной раскладкой карточек и системным ползунком.
 class ScrollPage {
     static instances := Map()
     static hooks := false

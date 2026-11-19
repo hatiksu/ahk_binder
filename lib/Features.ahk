@@ -104,6 +104,8 @@ class BinderFeatures {
         for label, button in this.factionButtons
             Theme.Select(button, label != 'Все' && label = name)
         this.factionButtons['Все'].Text := 'Все'
+        if this.HasOwnProp('entry')
+            this.entry.Refresh()
     }
 
     IsExtraFaction(name) {
@@ -164,6 +166,8 @@ class BinderFeatures {
         IniWrite number, this.ini, 'General', 'ESP'
         for n, button in this.espButtons
             Theme.Select(button, n = number)
+        if this.HasOwnProp('entry')
+            this.entry.Refresh()
     }
 
     SetGender(gender, *) {
@@ -337,7 +341,6 @@ class BinderFeatures {
         } else
             g.Opt('+E0x20')
         this.overlayWindows.Push({gui: g, index: index, textControl: textControl, text: text})
-        ; If the stored monitor is disconnected, bring the overlay back on-screen.
         if x < -3000 || x > A_ScreenWidth || y < -3000 || y > A_ScreenHeight
             x := 40, y := 60
         g.Show((A_Args.Length && A_Args[1] = '--check' ? 'Hide ' : 'NoActivate ') 'AutoSize x' x ' y' y)
@@ -456,6 +459,10 @@ class BinderFeatures {
                 DarkDialog.Message 'Изображение не найдено.'
                 return
             }
+            if key.Value != '' && key.Value = this.entry.key {
+                DarkDialog.Message 'Эта клавиша занята командами при входе.'
+                return
+            }
             for binding in this.binds {
                 if key.Value != '' && key.Value = binding.key {
                     DarkDialog.Message 'Сочетание занято биндом.'
@@ -468,7 +475,6 @@ class BinderFeatures {
                     return
                 }
             }
-            ; INI stores one line; visible newline markers are expanded when rendering.
             saved := {name: Trim(title.Value), text: StrReplace(StrReplace(body.Value, '`r'), '`n', '\n'),
                 image: picture.Value, key: key.Value, enabled: item.enabled, x: item.x, y: item.y}
             if fresh

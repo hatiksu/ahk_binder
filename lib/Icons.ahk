@@ -1,4 +1,3 @@
-; Контурные векторные иконки. Отрисовка GDI+ с антиалиасингом, без шрифтов и PNG.
 class Icons {
     static token := 0
     static cache := Map()
@@ -16,8 +15,6 @@ class Icons {
         if status
             throw Error('Не удалось загрузить векторные иконки')
         this.token := token
-        ; GDI+ остаётся загруженной до завершения процесса: окна могут получать
-        ; WM_PAINT во время закрытия, после выполнения обработчиков OnExit.
     }
 
     static Decode(text) {
