@@ -1,6 +1,6 @@
 class EntryCommands {
-    static commands := ['/hidecheatinfo', '/showcheats', '/dl', '/esp', '/templeader', '/chide', '/zzdebug', '/objdl', '/netstat']
-    static simpleCommands := ['/hidecheatinfo', '/showcheats', '/dl', '/chide', '/zzdebug', '/objdl', '/netstat']
+    static commands := ['/hidecheatinfo', '/showcheats', '/dl', '/esp', '/templeader', '/chide', '/zzdebug', '/objdl', '/netstat', '/gm']
+    static simpleCommands := ['/hidecheatinfo', '/showcheats', '/dl', '/chide', '/zzdebug', '/objdl', '/netstat', '/gm']
     __New(app) {
         this.app := app
         this.selected := Map()

@@ -36,7 +36,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.1'
+        this.version := '0.10.2'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -652,7 +652,7 @@ RunChecks() {
     if app.PrepareCommands('/esp 3') != '/esp 2'
         throw Error('Не работает выбор /esp')
     app.ShowPage('Команды при входе')
-    if app.currentPage != 'Команды при входе' || app.entry.buttons.Count != 7
+    if app.currentPage != 'Команды при входе' || app.entry.buttons.Count != 8
         throw Error('Не открывается список команд при входе')
     for command in EntryCommands.commands {
         if !app.entry.selected[command]
@@ -662,7 +662,7 @@ RunChecks() {
     for n in [1, 2, 3] {
         app.entry.ChooseESP(n)
         queue := app.entry.Queue()
-        if queue.Length != 9 || queue[4] != '/esp ' n || queue[5] != '/templeader 7'
+        if queue.Length != 10 || queue[4] != '/esp ' n || queue[5] != '/templeader 7'
             throw Error('Неверный порядок или параметры очереди команд')
     }
     app.faction := 'Все'
@@ -675,7 +675,7 @@ RunChecks() {
     app.entry.ChooseESP(0)
     app.entry.SelectFaction('Не использовать')
     queue := app.entry.Queue()
-    if queue.Length != 7 || app.entry.buttons.Has('/esp') || app.entry.buttons.Has('/templeader')
+    if queue.Length != 8 || app.entry.buttons.Has('/esp') || app.entry.buttons.Has('/templeader')
         throw Error('Дубли команд или выключенные команды остались в очереди')
     savedEntry := EntryCommands(app)
     if savedEntry.selected['/esp'] || savedEntry.selected['/templeader']
@@ -689,7 +689,7 @@ RunChecks() {
     if reloadedEntry.trigger != '.entry_test' || reloadedEntry.key != 'F9' || !reloadedEntry.selected['/netstat']
         throw Error('Набор команд не сохранился после перезапуска')
     app.entry.Toggle('/netstat')
-    if app.entry.Queue().Length != 8
+    if app.entry.Queue().Length != 9
         throw Error('Выключенная команда осталась в очереди')
     if app.entry.Conflict('F9', '/tl') = ''
         throw Error('Конфликт с существующим триггером не обнаружен')
