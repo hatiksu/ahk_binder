@@ -188,7 +188,8 @@ class EntryCommands {
                 }
                 if !this.Active(target)
                     return
-                SendText command
+                if !TextPaste.Put(command, target)
+                    return
                 Sleep 40
                 if !this.Active(target)
                     return

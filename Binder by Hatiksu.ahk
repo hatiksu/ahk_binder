@@ -31,12 +31,13 @@ SetKeyDelay 25, 25
 #Include lib\ReportOverlay.ahk
 #Include lib\GameWindow.ahk
 #Include lib\EntryCommands.ahk
+#Include lib\TextPaste.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.3'
+        this.version := '0.10.4'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -386,6 +387,15 @@ class Binder extends BinderView {
         return ownerPID != 0 && ownerPID != this.ownPID
     }
 
+    AppendText(actions, text) {
+        if text = ''
+            return
+        if actions.Length && actions[-1].type = 'text'
+            actions[-1].value .= text
+        else
+            actions.Push({type: 'text', value: text})
+    }
+
     BuildActions(text) {
         for name, field in this.variables
             text := StrReplace(text, '%' name '%', field.Value)
@@ -394,7 +404,7 @@ class Binder extends BinderView {
         while RegExMatch(text, '\{([^{}]+)\}', &match, pos) {
             literal := SubStr(text, pos, match.Pos - pos)
             if literal != ''
-                actions.Push({type: 'text', value: literal})
+                this.AppendText(actions, literal)
             token := StrLower(match[1])
             if token = 'rep' {
                 if !actions.Length || actions[-1].type != 'key' || actions[-1].value != 'Enter'
@@ -403,13 +413,19 @@ class Binder extends BinderView {
                 actions.Push({type: 'key', value: token = 'enter' ? 'Enter' : token})
             else if RegExMatch(token, '^(left|right|space)(?: (\d{1,3}))?$', &action) {
                 count := action[2] = '' ? 1 : Min(100, Integer(action[2]))
-                actions.Push({type: 'key', value: action[1] ' ' count})
+                if action[1] = 'space' {
+                    spaces := ''
+                    loop count
+                        spaces .= ' '
+                    this.AppendText(actions, spaces)
+                } else
+                    actions.Push({type: 'key', value: action[1] ' ' count})
             } else if token = '!'
-                actions.Push({type: 'text', value: '!'})
+                this.AppendText(actions, '!')
             pos := match.Pos + match.Len
         }
         if pos <= StrLen(text)
-            actions.Push({type: 'text', value: SubStr(text, pos)})
+            this.AppendText(actions, SubStr(text, pos))
         return actions
     }
 
@@ -434,10 +450,8 @@ class Binder extends BinderView {
                 continue
             }
             if action.type = 'text' {
-                if this.context()
-                    SendText action.value
-                else
-                    SendInput '{Text}' action.value
+                if !TextPaste.Put(action.value, target)
+                    return
             } else {
                 SendEvent '{' action.value '}'
                 Sleep 60
@@ -861,6 +875,24 @@ RunChecks() {
     chiefActions := app.BuildActions('%chhdis% %chcrimedis% %chgosdis%')
     if chiefActions.Length != 1 || chiefActions[1].value != '@чифхелперов @чифкрайма @чифгос'
         throw Error('Не подставляются Discord-поля чифов')
+    merged := app.BuildActions('Привет{space 2}мир{!}{enter}')
+    if merged.Length != 2 || merged[1].value != 'Привет  мир!' || merged[2].value != 'Enter'
+        throw Error('Сообщение разбивается на отдельные части')
+    originalClipboard := ClipboardAll()
+    pasteProbe := Gui()
+    pasteField := pasteProbe.AddEdit('w300 r3')
+    try {
+        A_Clipboard := 'Буфер до вставки'
+        sampleText := 'Привет, мир! Кириллица, знаки +^!# и ссылка https://example.com'
+        if !TextPaste.WithClipboard(sampleText, PasteIntoProbe) || pasteField.Value != sampleText || A_Clipboard != 'Буфер до вставки'
+            throw Error('Вставка целого сообщения или восстановление буфера не работает')
+        TextPaste.WithClipboard('Временный текст', CopyDuringPaste)
+        if A_Clipboard != 'Новое копирование'
+            throw Error('Биндер затёр новое содержимое буфера')
+    } finally {
+        A_Clipboard := originalClipboard
+        pasteProbe.Destroy()
+    }
     first := app.BuildActions('Приветствую.{enter}{rep}')
     second := app.BuildActions('Здравствуйте.{rep}')
     if first.Length != 2 || first[2].value != 'Enter' || second.Length != 2 || second[2].value != 'Enter'
@@ -921,6 +953,14 @@ RunChecks() {
     FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and automatic totals`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp
+    PasteIntoProbe() {
+        DllCall('SendMessageW', 'ptr', pasteField.Hwnd, 'uint', 0x302, 'uptr', 0, 'ptr', 0)
+        return true
+    }
+    CopyDuringPaste() {
+        A_Clipboard := 'Новое копирование'
+        return true
+    }
     FillPrompt() {
         DarkDialog.last.input.Value := 'Проверка'
         CheckClick(DarkDialog.last.buttons[1])
