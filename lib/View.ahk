@@ -508,7 +508,7 @@ class BinderView extends BinderFeatures {
         this.Button(page, 298, 125, 144, '← На главную', (*) => this.ShowPage('Основное'))
         this.historyScroll := ScrollPage(this.window, 298, 180, 832, 507)
         for entry in this.history
-            this.historyScroll.AddCard(entry.version, entry.lines, entry.version = this.version ? 'Текущая версия' : 'Предыдущая версия')
+            this.historyScroll.AddCard(entry.version, entry.lines, entry.version = this.version ? 'Текущая версия' : entry.date)
         this.historyScroll.Finish()
         this.pages[page].Push(this.historyScroll)
     }

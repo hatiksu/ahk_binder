@@ -37,7 +37,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.4'
+        this.version := '0.10.5'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -548,6 +548,12 @@ RunChecks() {
         }
         if !found
             throw Error('Из истории пропала версия ' required)
+    }
+    for entry in app.history {
+        if !RegExMatch(entry.date, '^\d{2}\.\d{2}\.\d{4}$')
+            throw Error('Нет даты выпуска версии ' entry.version)
+        if entry.version = '0.8.1' && entry.date != '18.11.2026'
+            throw Error('Дата выпуска не совпадает с GitHub')
     }
     if app.historyScroll.cards.Length != app.history.Length
         throw Error('Не все версии отображаются в истории')

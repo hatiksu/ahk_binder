@@ -143,9 +143,11 @@ class ReleaseHistory {
         entries := [], current := 0
         for line in StrSplit(StrReplace(FileRead(path, 'UTF-8'), '`r'), '`n') {
             if RegExMatch(line, '^## (\d+\.\d+\.\d+)\s*$', &version) {
-                current := {version: version[1], lines: []}
+                current := {version: version[1], date: '', lines: []}
                 entries.Push(current)
-            } else if current && RegExMatch(line, '^- (.+)$', &bullet)
+            } else if current && RegExMatch(line, '^Дата выпуска: (\d{2}\.\d{2}\.\d{4})$', &published)
+                current.date := published[1]
+            else if current && RegExMatch(line, '^- (.+)$', &bullet)
                 current.lines.Push('• ' bullet[1])
         }
         return entries
