@@ -31,13 +31,13 @@ SetKeyDelay 25, 25
 #Include lib\ReportOverlay.ahk
 #Include lib\GameWindow.ahk
 #Include lib\EntryCommands.ahk
-#Include lib\TextPaste.ahk
+#Include lib\TextInput.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.5'
+        this.version := '0.10.6'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -322,6 +322,11 @@ class Binder extends BinderView {
         this.Refresh()
     }
 
+    Restart(*) {
+        this.PersistPreferences()
+        Reload
+    }
+
     SaveSettings() {
         key := this.chatKeyField.Value
         if key = '' || !GetKeyVK(key) {
@@ -450,7 +455,7 @@ class Binder extends BinderView {
                 continue
             }
             if action.type = 'text' {
-                if !TextPaste.Put(action.value, target)
+                if !TextInput.Put(action.value, target)
                     return
             } else {
                 SendEvent '{' action.value '}'
@@ -884,21 +889,6 @@ RunChecks() {
     merged := app.BuildActions('Привет{space 2}мир{!}{enter}')
     if merged.Length != 2 || merged[1].value != 'Привет  мир!' || merged[2].value != 'Enter'
         throw Error('Сообщение разбивается на отдельные части')
-    originalClipboard := ClipboardAll()
-    pasteProbe := Gui()
-    pasteField := pasteProbe.AddEdit('w300 r3')
-    try {
-        A_Clipboard := 'Буфер до вставки'
-        sampleText := 'Привет, мир! Кириллица, знаки +^!# и ссылка https://example.com'
-        if !TextPaste.WithClipboard(sampleText, PasteIntoProbe) || pasteField.Value != sampleText || A_Clipboard != 'Буфер до вставки'
-            throw Error('Вставка целого сообщения или восстановление буфера не работает')
-        TextPaste.WithClipboard('Временный текст', CopyDuringPaste)
-        if A_Clipboard != 'Новое копирование'
-            throw Error('Биндер затёр новое содержимое буфера')
-    } finally {
-        A_Clipboard := originalClipboard
-        pasteProbe.Destroy()
-    }
     first := app.BuildActions('Приветствую.{enter}{rep}')
     second := app.BuildActions('Здравствуйте.{rep}')
     if first.Length != 2 || first[2].value != 'Enter' || second.Length != 2 || second[2].value != 'Enter'
@@ -959,14 +949,6 @@ RunChecks() {
     FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and automatic totals`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp
-    PasteIntoProbe() {
-        DllCall('SendMessageW', 'ptr', pasteField.Hwnd, 'uint', 0x302, 'uptr', 0, 'ptr', 0)
-        return true
-    }
-    CopyDuringPaste() {
-        A_Clipboard := 'Новое копирование'
-        return true
-    }
     FillPrompt() {
         DarkDialog.last.input.Value := 'Проверка'
         CheckClick(DarkDialog.last.buttons[1])

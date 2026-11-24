@@ -278,6 +278,7 @@ class BinderView extends BinderFeatures {
         this.Label(page, 298, 481, 800, 'У каждого профиля свои наборы, бинды, Discord, репорты и оверлеи.`nНастройки хранятся локально и не публикуются в GitHub.', 10, 'A9A9B3', , 55)
         this.Button(page, 298, 571, 240, 'Сохранить настройки', (*) => this.SaveSettings(), true)
         this.Button(page, 552, 571, 220, 'Открыть папку профиля', (*) => Run(this.dir))
+        this.restartButton := this.Button(page, 786, 571, 344, '↻ Перезапустить биндер', this.Restart.Bind(this))
         this.Label(page, 298, 655, 800, 'Поддерживаются {enter}, {left N}, {space}, {tab}, {esc}, {rep}.', 9, '8F8F9B')
     }
 

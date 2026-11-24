@@ -188,7 +188,7 @@ class EntryCommands {
                 }
                 if !this.Active(target)
                     return
-                if !TextPaste.Put(command, target)
+                if !TextInput.Put(command, target)
                     return
                 Sleep 40
                 if !this.Active(target)
