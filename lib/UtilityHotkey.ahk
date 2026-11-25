@@ -21,6 +21,8 @@ class UtilityHotkey {
             owner.status.Text := conflict
             return
         }
+        if owner.running
+            owner.Stop()
         previous := owner.key
         owner.key := key
         try owner.Register()
@@ -32,10 +34,13 @@ class UtilityHotkey {
         }
         section := owner is Clicker ? 'Clicker' : 'MassPunishments'
         IniWrite key, owner.app.ini, section, 'Key'
-        owner.status.Text := key = '' ? 'Клавиша убрана.' : 'Клавиша сохранена. Нажатие в игре запускает и останавливает.'
+        owner.status.Text := key = '' ? 'Клавиша убрана.' : (owner is Clicker ? 'Клавиша сохранена. Работает во всех приложениях.' : 'Клавиша сохранена. Нажатие в игре запускает и останавливает.')
     }
     static Register(owner) {
-        HotIf owner.app.context
+        if owner is Clicker
+            HotIf
+        else
+            HotIf owner.app.context
         try {
             if owner.HasOwnProp('registeredKey') && owner.registeredKey != ''
                 Hotkey owner.registeredKey, 'Off'

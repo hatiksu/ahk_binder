@@ -150,11 +150,13 @@ class BinderFeatures {
 
     UpdateGameStatus() {
         hwnd := this.gameWindow.Refresh()
+        if !this.HasOwnProp('gameStatus')
+            return
         try text := hwnd ? 'Окно игры: ' WinGetTitle(hwnd) : 'Ожидаю окно игры'
         catch TargetError
             text := 'Ожидаю окно игры'
         text .= this.gameWindow.mode = 'auto' ? ' (автоматически)' : ' (выбрано вручную)'
-        if this.gameStatus.Text != text
+        if this.HasOwnProp('gameStatus') && this.gameStatus.Text != text
             this.gameStatus.Text := text
     }
 

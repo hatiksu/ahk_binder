@@ -1006,9 +1006,18 @@ RunChecks() {
         throw Error('Допущен конфликт клавиш')
     app.mass.keyField.Value := ''
     app.mass.SaveKey()
-    app.clicker.Start()
-    if app.clicker.running
-        throw Error('Кликер запущен вне игры')
+    Critical
+    try {
+        app.clicker.Start()
+        if !app.clicker.running
+            throw Error('Кликер не запущен вне игры')
+        app.clicker.Stop()
+        if app.clicker.running
+            throw Error('Кликер не остановлен')
+    } finally {
+        app.clicker.Stop()
+        Critical 'Off'
+    }
     FileAppend 'OK: mass commands, duplicates, invalid input, frozen queue and cancellation`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp

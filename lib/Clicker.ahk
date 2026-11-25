@@ -18,9 +18,8 @@ class Clicker {
         this.keyField := KeyPicker(app.window, 'x298 y407 w420 h40', this.key)
         app.pages[page].Push(this.keyField.control)
         app.Button(page, 738, 407, 210, 'Сохранить клавишу', this.SaveKey.Bind(this))
-        app.Button(page, 298, 465, 180, 'Остановить', this.Stop.Bind(this))
-        this.status := app.Label(page, 298, 527, 824, 'Кликер остановлен', 11, 'B8B8C0', , 48)
-        app.Label(page, 298, 600, 824, 'Назначенная клавиша запускает и останавливает кликер в игре. Он нажимает в текущем положении курсора. При переключении из игры работа остановится.', 10, 'A9A9B3', , 60)
+        this.status := app.Label(page, 298, 480, 824, 'Кликер остановлен', 11, 'B8B8C0', , 48)
+        app.Label(page, 298, 555, 824, 'Нажми назначенную клавишу в любом приложении для запуска. Нажми ещё раз для остановки. Кликер нажимает в текущем положении курсора и продолжает работать при смене окна.', 10, 'A9A9B3', , 60)
         this.Choose(this.button)
         this.Register()
     }
@@ -64,13 +63,9 @@ class Clicker {
             this.status.Text := 'Дождись завершения отправки команд.'
             return
         }
-        if !this.app.context() {
-            this.status.Text := 'Запуск доступен только в окне игры.'
-            return
-        }
         this.interval := interval, this.activeButton := this.button
         IniWrite interval, this.app.ini, 'Clicker', 'Interval'
-        this.running := true, this.target := DllCall('GetForegroundWindow', 'ptr'), this.count := 0
+        this.running := true, this.count := 0
         this.status.Text := 'Кликер запущен.'
         SetTimer this.tickCallback, -1
     }
@@ -82,12 +77,6 @@ class Clicker {
     Tick() {
         if !this.running
             return
-        if !this.target
-            this.target := DllCall('GetForegroundWindow', 'ptr')
-        if !this.app.context() || DllCall('GetForegroundWindow', 'ptr') != this.target {
-            this.Stop()
-            return
-        }
         try {
             SendEvent '{Click ' this.activeButton '}'
             this.count += 1
