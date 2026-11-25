@@ -39,7 +39,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.11.0'
+        this.version := '0.11.1'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -357,7 +357,7 @@ class Binder extends BinderView {
             Hotstring name, , 'Off'
         this.registered := [], failures := []
         for item in this.config.entries {
-            options := '?XOZ'
+            options := '?XOZK-1'
             if InStr(item.options, '*')
                 options .= '*'
             name := ':' options ':' item.key
@@ -444,6 +444,7 @@ class Binder extends BinderView {
         if !(openChat ? this.context() : this.triggerContext())
             return
         target := WinExist('A')
+        SetKeyDelay -1, -1
         Hotstring 'Reset'
         actions := this.BuildActions(text)
         if openChat {
@@ -454,7 +455,7 @@ class Binder extends BinderView {
             SendEvent '{' this.chatKey '}'
             Sleep this.chatDelay
         }
-        for action in actions {
+        for index, action in actions {
             if WinExist('A') != target
                 return
             if target = this.testChatHwnd {
@@ -466,7 +467,8 @@ class Binder extends BinderView {
                     return
             } else {
                 SendEvent '{' action.value '}'
-                Sleep 60
+                if index < actions.Length && action.value = 'Enter'
+                    Sleep 30
             }
         }
     }

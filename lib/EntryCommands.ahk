@@ -136,7 +136,7 @@ class EntryCommands {
         try {
             if this.Conflict(this.key, this.trigger) != ''
                 return
-            name := ':?XOZ:' this.trigger
+            name := ':?XOZK-1:' this.trigger
             Hotstring name, this.Run.Bind(this, true), 'On'
             this.registeredTrigger := name
             if this.key != '' {
