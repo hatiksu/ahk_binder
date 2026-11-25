@@ -167,7 +167,7 @@ class EntryCommands {
         return WinExist('A') = target && this.app.context()
     }
     Run(fromChat := false, *) {
-        if this.running || !this.app.context()
+        if this.running || this.app.mass.running || this.app.clicker.running || !this.app.context()
             return
         try commands := this.Queue()
         catch as err {

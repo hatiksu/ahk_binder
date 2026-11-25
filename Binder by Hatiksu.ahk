@@ -31,13 +31,15 @@ SetKeyDelay 25, 25
 #Include lib\ReportOverlay.ahk
 #Include lib\GameWindow.ahk
 #Include lib\EntryCommands.ahk
+#Include lib\MassPunishments.ahk
+#Include lib\Clicker.ahk
 #Include lib\TextInput.ahk
 #Include lib\Features.ahk
 #Include lib\View.ahk
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.10.7'
+        this.version := '0.11.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -63,6 +65,8 @@ class Binder extends BinderView {
         }
         this.Load()
         this.entry := EntryCommands(this)
+        this.mass := MassPunishments(this)
+        this.clicker := Clicker(this)
         this.Build()
         this.Activate()
         if FileExist(A_ScriptDir '\assets\Binder.ico')
@@ -435,6 +439,8 @@ class Binder extends BinderView {
     }
 
     Emit(text, openChat, *) {
+        if this.mass.running
+            return
         if !(openChat ? this.context() : this.triggerContext())
             return
         target := WinExist('A')
@@ -948,6 +954,46 @@ RunChecks() {
     movingHUD.gui.Destroy()
     app.overlayMoving := false
     FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and automatic totals`n', '*'
+    batch := MassPunishments.Queue('12, 34`n12; 056', '/mute {id} 30 Причина')
+    if batch.Length != 3 || batch[1] != '/mute 12 30 Причина' || batch[3] != '/mute 56 30 Причина'
+        throw Error('Неверно разобран список массовых наказаний')
+    for invalid in [['12 x', '/kick {id} Причина'], ['', '/kick {id} Причина'], ['12', '/kick Причина'], ['12', '/kick {id} {id}'], ['12', '/kick {id}`n/ban 1']] {
+        rejected := false
+        try MassPunishments.Queue(invalid[1], invalid[2])
+        catch ValueError
+            rejected := true
+        if !rejected
+            throw Error('Принята неверная массовая команда')
+    }
+    app.mass.ids.Value := '12, 34'
+    app.mass.template.Value := '/mute {id} 30 Причина'
+    app.mass.Start()
+    originalQueue := app.mass.queue
+    app.mass.ids.Value := '99'
+    app.mass.Start()
+    if app.mass.queue != originalQueue || app.mass.queue.Length != 2 || app.mass.sent != 0
+        throw Error('Повторный запуск изменил очередь')
+    app.mass.Stop()
+    if app.mass.running
+        throw Error('Не остановлена массовая отправка')
+    if Clicker.Interval('50') != 50 || Clicker.Interval('60000') != 60000
+        throw Error('Неверно обработан интервал кликера')
+    for invalid in ['0', '49', '60001', '-100', 'abc'] {
+        rejected := false
+        try Clicker.Interval(invalid)
+        catch ValueError
+            rejected := true
+        if !rejected
+            throw Error('Принят неверный интервал кликера')
+    }
+    app.clicker.Start()
+    app.mass.Start()
+    if app.mass.running || !app.clicker.running
+        throw Error('Разрешена одновременная работа кликера и массовых команд')
+    app.clicker.Stop()
+    if app.clicker.running
+        throw Error('Не остановлен кликер')
+    FileAppend 'OK: mass commands, duplicates, invalid input, frozen queue and cancellation`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp
     FillPrompt() {

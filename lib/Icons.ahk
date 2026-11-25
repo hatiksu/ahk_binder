@@ -2,7 +2,7 @@ class Icons {
     static token := 0
     static cache := Map()
     static prefixes := Map('⌂', 'home', '▱', 'layers', '⌨', 'keyboard', 'ϟ', 'zap', '▣', 'folder',
-        '⚙', 'settings', '▤', 'history', '↻', 'refresh', '◉', 'discord', 'ⓘ', 'help', '↗', 'upload',
+        '≡', 'history', '☝', 'mouse', '⚙', 'settings', '▤', 'history', '↻', 'refresh', '◉', 'discord', 'ⓘ', 'help', '↗', 'upload',
         '↓', 'download', '↑', 'upload', '+', 'plus', '−', 'minus', '×', 'close', '←', 'back',
         '✥', 'move', '✓', 'check', '⌁', 'folder', '☷', 'sliders', '✦', 'sparkles', '●', 'check-circle', '○', 'circle')
 
@@ -62,6 +62,10 @@ class Icons {
                     this.Lines(graphics, pen, [3,8, 12,3, 21,8, 12,13, 3,8])
                     this.Lines(graphics, pen, [3,12, 12,17, 21,12])
                     this.Lines(graphics, pen, [3,16, 12,21, 21,16])
+                case 'mouse':
+                    this.Box(graphics, pen, 5, 2, 14, 20)
+                    this.Line(graphics, pen, 12, 2, 12, 10)
+                    this.Line(graphics, pen, 5, 10, 19, 10)
                 case 'keyboard':
                     this.Box(graphics, pen, 2, 5, 20, 14)
                     for row in [9, 12] {

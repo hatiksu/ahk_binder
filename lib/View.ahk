@@ -17,8 +17,8 @@ class BinderView extends BinderFeatures {
         this.refreshing := false
         this.queuedPage := ''
         this.pageDispatch := this.DispatchQueuedPage.Bind(this)
-        names := ['Основное', 'Оверлеи', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Настройки']
-        symbols := ['⌂', '▱', '⌨', 'ϟ', '▣', '⚙']
+        names := ['Основное', 'Оверлеи', 'Бинды клавиш', 'Триггеры', 'Репорты', 'Массовые наказания', 'Кликер', 'Настройки']
+        symbols := ['⌂', '▱', '⌨', 'ϟ', '▣', '≡', '☝', '⚙']
         for i, name in names {
             y := 144 + (i - 1) * 40
             if name = 'Настройки'
@@ -39,6 +39,8 @@ class BinderView extends BinderFeatures {
         this.Card('Основное', 272, 90, 884, 623)
         this.BuildHome()
         this.entry.Build()
+        this.mass.Build()
+        this.clicker.Build()
         this.BuildTriggers()
         this.BuildBinds()
         this.BuildSettings()
@@ -393,6 +395,8 @@ class BinderView extends BinderFeatures {
                 Theme.Select(this.nav[name], true)
             subtitles := Map('Основное', 'Установите базовые настройки конфига', 'Оверлеи', 'Настройка и управление оверлеями на экране',
                 'Бинды клавиш', 'Создавайте сочетания для быстрого выполнения команд', 'Триггеры', 'Управление сокращениями и конфигами',
+                'Кликер', 'Автоматические нажатия мыши в окне игры',
+                'Массовые наказания', 'Отправка команд по списку ID с интервалом в секунду',
                 'Репорты', 'Дневная норма, история и статистика', 'Настройки', 'Настройки игры и текущего профиля',
                 'Change Log', 'История обновлений Binder by Hatiksu', 'Гайд', 'Как настроить и использовать Binder by Hatiksu', 'Команды при входе', 'Один бинд для выбранных команд')
             this.pageTitle.Text := name
