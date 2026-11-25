@@ -136,7 +136,7 @@ class EntryCommands {
         try {
             if this.Conflict(this.key, this.trigger) != ''
                 return
-            name := ':?XO:' this.trigger
+            name := ':?XOZ:' this.trigger
             Hotstring name, this.Run.Bind(this, true), 'On'
             this.registeredTrigger := name
             if this.key != '' {
@@ -175,6 +175,7 @@ class EntryCommands {
             return
         }
         target := WinExist('A')
+        Hotstring 'Reset'
         this.running := true
         try {
             for modifier in ['Ctrl', 'Alt', 'Shift', 'LWin', 'RWin']
