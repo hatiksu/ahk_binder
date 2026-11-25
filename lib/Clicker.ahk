@@ -14,12 +14,10 @@ class Clicker {
         this.right := app.Button(page, 514, 178, 200, 'Правая', this.Choose.Bind(this, 'Right'))
         app.Label(page, 298, 246, 600, 'Интервал между нажатиями, мс', 11)
         this.intervalField := app.RoundedInput(page, 298, 283, 240, 40, IniRead(app.ini, 'Clicker', 'Interval', '1000'))
-        app.Label(page, 298, 341, 800, 'От 50 до 60000 мс. 1000 мс = 1 секунда.', 10, 'A9A9B3')
         this.keyField := KeyPicker(app.window, 'x298 y407 w420 h40', this.key)
         app.pages[page].Push(this.keyField.control)
         app.Button(page, 738, 407, 210, 'Сохранить клавишу', this.SaveKey.Bind(this))
         this.status := app.Label(page, 298, 480, 824, 'Кликер остановлен', 11, 'B8B8C0', , 48)
-        app.Label(page, 298, 555, 824, 'Нажми назначенную клавишу в любом приложении для запуска. Нажми ещё раз для остановки. Кликер нажимает в текущем положении курсора и продолжает работать при смене окна.', 10, 'A9A9B3', , 60)
         this.Choose(this.button)
         this.Register()
     }

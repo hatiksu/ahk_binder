@@ -170,7 +170,7 @@ class Binder extends BinderView {
             k := d.AddEdit('w650 h36 Background252527 cEEEEF2 -Multi -VScroll', key)
             Theme.Dark(k)
         }
-        d.AddText('w650', 'Текст и действия: {enter}, {tab}, {esc}')
+        d.AddText('w650', 'Текст и действия')
         t := d.AddEdit('w650 r8 Background252527 cEEEEF2', text)
         Theme.Dark(t)
         saveButton := Theme.Button(d, 'w180 h38 y+20 Default', 'Сохранить', '765DFF')

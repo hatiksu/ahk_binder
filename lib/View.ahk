@@ -246,7 +246,6 @@ class BinderView extends BinderFeatures {
     BuildBinds() {
         page := 'Бинды клавиш'
         this.Card(page, 272, 102, 884, 611)
-        this.Label(page, 298, 125, 810, 'Быстрые команды на удобных сочетаниях клавиш', 11, 'A9A9B3')
         this.bindEmptyPanel := this.Card(page, 298, 173, 832, 416, '1B1B1E')
         this.bindList := this.Add(page, 'ListView', 'x298 y173 w832 h416 -Multi', ['Клавиши', 'Текст / действия'])
         this.bindList.OnEvent('DoubleClick', (*) => this.EditBind())
@@ -259,27 +258,23 @@ class BinderView extends BinderFeatures {
         this.Button(page, 298, 615, 180, '+ Добавить бинд', (*) => this.EditBind(true), true)
         this.Button(page, 490, 615, 150, 'Изменить', (*) => this.EditBind())
         this.Button(page, 652, 615, 150, 'Удалить', (*) => this.DeleteBind())
-        this.Label(page, 300, 675, 810, 'Добавь {enter} в конце, чтобы отправить сообщение.', 9, '8F8F9B')
     }
 
     BuildSettings() {
         page := 'Настройки'
         this.Card(page, 272, 102, 884, 611)
-        this.Card(page, 298, 128, 832, 228, '19191B')
+        this.Card(page, 298, 128, 832, 170, '19191B')
         this.Label(page, 322, 149, 760, 'Настройки ввода', 13, , 700)
         this.Label(page, 322, 199, 350, 'Клавиша открытия чата', 10, 'B8B8C0')
         this.chatKeyField := KeyPicker(this.window, 'x322 y230 w350 h40', this.chatKey)
         this.pages[page].Push(this.chatKeyField.control)
         this.Label(page, 702, 199, 390, 'Задержка открытия чата, мс', 10, 'B8B8C0')
         this.chatDelayField := this.RoundedInput(page, 702, 230, 404, 40, this.chatDelay, true)
-        this.Label(page, 322, 291, 764, 'Если текст бинда появляется раньше чата, увеличь задержку. Триггеры работают в уже открытом чате.', 10, 'A9A9B3', , 44)
-        this.Card(page, 298, 376, 832, 170, '19191B')
-        this.Label(page, 322, 398, 760, 'Профиль: ' this.profile, 13, , 700)
-        this.Label(page, 322, 440, 764, 'У каждого профиля свои триггеры, бинды, Discord, репорты и оверлеи. Настройки сохраняются на компьютере.', 10, 'A9A9B3', , 44)
-        this.Button(page, 322, 493, 240, 'Открыть папку профиля', (*) => Run(this.dir))
-        this.Button(page, 298, 578, 404, 'Сохранить настройки', (*) => this.SaveSettings(), true)
-        this.restartButton := this.Button(page, 718, 578, 412, '↻ Перезапустить биндер', this.Restart.Bind(this))
-        this.Label(page, 298, 652, 832, 'Поддерживаются {enter}, {left N}, {space}, {tab}, {esc}, {rep}.', 9, '8F8F9B')
+        this.Card(page, 298, 322, 832, 136, '19191B')
+        this.Label(page, 322, 344, 760, 'Профиль: ' this.profile, 13, , 700)
+        this.Button(page, 322, 394, 240, 'Открыть папку профиля', (*) => Run(this.dir))
+        this.Button(page, 298, 488, 404, 'Сохранить настройки', (*) => this.SaveSettings(), true)
+        this.restartButton := this.Button(page, 718, 488, 412, '↻ Перезапустить биндер', this.Restart.Bind(this))
     }
 
     BuildOverlayPage() {
@@ -288,7 +283,6 @@ class BinderView extends BinderFeatures {
         this.Card(page, 298, 127, 832, 218, '19191B')
         this.Button(page, 320, 171, 46, '▣', (*) => this.ShowPage('Репорты'), true, 46)
         this.Label(page, 384, 150, 240, 'Счётчик репортов', 12, , 700)
-        this.Label(page, 384, 181, 210, 'Выводит на экран`nколичество репортов`nи норму на день', 10, 'B0B0B8', , 64)
         this.overlayToggle := this.Button(page, 616, 174, 136, this.overlayEnabled ? '● Включён' : '○ Выключен', this.ToggleReportOverlay.Bind(this), false, 38)
         Theme.Select(this.overlayToggle, this.overlayEnabled)
         this.Button(page, 768, 174, 108, 'К репортам', (*) => this.ShowPage('Репорты'))
@@ -300,7 +294,6 @@ class BinderView extends BinderFeatures {
         Theme.Select(this.classicButton, this.overlayStyle = 'classic')
         Theme.Select(this.compactButton, this.overlayStyle = 'compact')
         this.Label(page, 298, 385, 600, 'Кастомные оверлеи', 13, , 700)
-        this.Label(page, 298, 417, 620, 'Создавайте свои оверлеи с текстом, картинками и биндами клавиш', 10, 'A9A9B3')
         this.Button(page, 946, 384, 184, '+ Создать оверлей', (*) => this.EditOverlay(true), true)
         this.customEmptyPanel := this.Card(page, 298, 461, 832, 155, '1B1B1E')
         this.customList := this.Add(page, 'ListView', 'x298 y461 w832 h155 -Multi -Hdr', ['', 'Название', 'Клавиши', 'Содержимое'])

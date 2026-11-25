@@ -11,7 +11,6 @@ class MassPunishments {
         app := this.app, page := 'Массовые наказания'
         app.Card(page, 272, 102, 884, 611)
         app.Label(page, 298, 122, 810, 'Добавить наказания', 13, , 700)
-        app.Label(page, 298, 153, 810, 'Вводи готовые команды. Каждое наказание с новой строки, например /mute 123 30 Причина.', 10, 'A9A9B3')
         this.input := app.window.AddEdit('x298 y187 w610 h80 Multi WantReturn VScroll Background252527 cEEEEF2 -E0x200')
         Theme.Dark(this.input)
         app.pages[page].Push(this.input)
@@ -24,7 +23,7 @@ class MassPunishments {
         this.keyField := KeyPicker(app.window, 'x298 y578 w420 h40', this.key)
         app.pages[page].Push(this.keyField.control)
         app.Button(page, 738, 578, 210, 'Сохранить клавишу', this.SaveKey.Bind(this))
-        this.status := app.Label(page, 298, 636, 824, 'Назначь клавишу. В игре она запускает и останавливает выдачу.', 10, 'B8B8C0', , 52)
+        this.status := app.Label(page, 298, 636, 824, 'В очереди: 0.', 10, 'B8B8C0', , 52)
         this.Register()
     }
     static Queue(text) {
@@ -60,7 +59,7 @@ class MassPunishments {
         this.list.Delete()
         for index, command in this.draft
             this.list.Add('', index, command)
-        this.status.Text := 'В очереди: ' this.draft.Length '. Выдача по порядку, раз в секунду. Чат перед запуском должен быть закрыт.'
+        this.status.Text := 'В очереди: ' this.draft.Length '.'
     }
     Remove(*) {
         if this.running

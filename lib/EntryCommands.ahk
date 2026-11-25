@@ -38,7 +38,6 @@ class EntryCommands {
         app.pages[page].Push(this.keyField.control)
         app.Button(page, 298, 578, 220, 'Сохранить бинд', this.Save.Bind(this), true)
         this.status := app.Label(page, 538, 586, 590, '', 9, 'B8B8C0')
-        app.Label(page, 298, 651, 820, 'Введи триггер и пробел в чате игры или нажми назначенные клавиши. При смене окна выполнение остановится.', 9, '8F8F9B', , 40)
         this.Refresh()
     }
     Refresh() {
