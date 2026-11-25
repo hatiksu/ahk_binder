@@ -2,6 +2,7 @@ class Clicker {
     __New(app) {
         this.app := app
         this.running := false
+        this.key := IniRead(app.ini, 'Clicker', 'Key', '')
         this.button := IniRead(app.ini, 'Clicker', 'Button', 'Left') = 'Right' ? 'Right' : 'Left'
         this.tickCallback := this.Tick.Bind(this)
     }
@@ -14,11 +15,14 @@ class Clicker {
         app.Label(page, 298, 246, 600, 'Интервал между нажатиями, мс', 11)
         this.intervalField := app.RoundedInput(page, 298, 283, 240, 40, IniRead(app.ini, 'Clicker', 'Interval', '1000'))
         app.Label(page, 298, 341, 800, 'От 50 до 60000 мс. 1000 мс = 1 секунда.', 10, 'A9A9B3')
-        app.Button(page, 298, 407, 250, 'Запустить через 3 секунды', this.Start.Bind(this), true)
-        app.Button(page, 568, 407, 180, 'Остановить', this.Stop.Bind(this))
-        this.status := app.Label(page, 298, 475, 824, 'Кликер остановлен', 11, 'B8B8C0', , 48)
-        app.Label(page, 298, 570, 824, 'После запуска переключись в игру и наведи курсор на нужное место. При переключении из игры кликер остановится. Чтобы продолжить, запусти его снова.', 10, 'A9A9B3', , 60)
+        this.keyField := KeyPicker(app.window, 'x298 y407 w420 h40', this.key)
+        app.pages[page].Push(this.keyField.control)
+        app.Button(page, 738, 407, 210, 'Сохранить клавишу', this.SaveKey.Bind(this))
+        app.Button(page, 298, 465, 180, 'Остановить', this.Stop.Bind(this))
+        this.status := app.Label(page, 298, 527, 824, 'Кликер остановлен', 11, 'B8B8C0', , 48)
+        app.Label(page, 298, 600, 824, 'Назначенная клавиша запускает и останавливает кликер в игре. Он нажимает в текущем положении курсора. При переключении из игры работа остановится.', 10, 'A9A9B3', , 60)
         this.Choose(this.button)
+        this.Register()
     }
     Choose(button, *) {
         this.button := button
@@ -30,6 +34,23 @@ class Clicker {
         if !RegExMatch(value, '^\d{2,5}$') || Integer(value) < 50 || Integer(value) > 60000
             throw ValueError('Укажи интервал от 50 до 60000 мс.')
         return Integer(value)
+    }
+    SaveKey(*) {
+        UtilityHotkey.Save(this)
+    }
+    Register() {
+        UtilityHotkey.Register(this)
+    }
+    Toggle(*) {
+        if this.running
+            this.Stop()
+        else {
+            for modifier in ['Ctrl', 'Alt', 'Shift', 'LWin', 'RWin']
+                KeyWait modifier
+            this.Start()
+        }
+        if this.key != ''
+            KeyWait RegExReplace(this.key, '^[~*$<>^!+#]+')
     }
     Start(*) {
         if this.running
@@ -43,11 +64,15 @@ class Clicker {
             this.status.Text := 'Дождись завершения отправки команд.'
             return
         }
+        if !this.app.context() {
+            this.status.Text := 'Запуск доступен только в окне игры.'
+            return
+        }
         this.interval := interval, this.activeButton := this.button
         IniWrite interval, this.app.ini, 'Clicker', 'Interval'
-        this.running := true, this.target := 0, this.count := 0
-        this.status.Text := 'Переключись в игру. Запуск через 3 секунды.'
-        SetTimer this.tickCallback, -3000
+        this.running := true, this.target := DllCall('GetForegroundWindow', 'ptr'), this.count := 0
+        this.status.Text := 'Кликер запущен.'
+        SetTimer this.tickCallback, -1
     }
     Stop(*) {
         SetTimer this.tickCallback, 0

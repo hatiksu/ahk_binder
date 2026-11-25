@@ -31,6 +31,7 @@ SetKeyDelay 25, 25
 #Include lib\ReportOverlay.ahk
 #Include lib\GameWindow.ahk
 #Include lib\EntryCommands.ahk
+#Include lib\UtilityHotkey.ahk
 #Include lib\MassPunishments.ahk
 #Include lib\Clicker.ahk
 #Include lib\TextInput.ahk
@@ -39,7 +40,7 @@ SetKeyDelay 25, 25
 class Binder extends BinderView {
     __New() {
         this.InitProfile()
-        this.version := '0.11.1'
+        this.version := '0.11.0'
         this.history := ReleaseHistory.Load(A_ScriptDir '\CHANGELOG.md')
         this.gender := IniRead(this.ini, 'General', 'Gender', 'male')
         if this.gender != 'female'
@@ -285,6 +286,10 @@ class Binder extends BinderView {
     }
 
     StoreBind(index, key, text) {
+        if key != '' && (key = this.mass.key || key = this.clicker.key) {
+            DarkDialog.Message 'Эта клавиша занята массовой выдачей или кликером.'
+            return
+        }
         if key != '' && key = this.entry.key {
             DarkDialog.Message 'Эта клавиша занята командами при входе.'
             return false
@@ -956,30 +961,31 @@ RunChecks() {
     movingHUD.gui.Destroy()
     app.overlayMoving := false
     FileAppend 'OK: confirmed closure, OCR gaps, report switching, deduplication, restart and automatic totals`n', '*'
-    batch := MassPunishments.Queue('12, 34`n12; 056', '/mute {id} 30 Причина')
-    if batch.Length != 3 || batch[1] != '/mute 12 30 Причина' || batch[3] != '/mute 56 30 Причина'
-        throw Error('Неверно разобран список массовых наказаний')
-    for invalid in [['12 x', '/kick {id} Причина'], ['', '/kick {id} Причина'], ['12', '/kick Причина'], ['12', '/kick {id} {id}'], ['12', '/kick {id}`n/ban 1']] {
+    batch := MassPunishments.Queue('/mute 12 30 Причина`n/kick 34 Причина`n/mute 12 30 Причина')
+    if batch.Length != 3 || batch[2] != '/kick 34 Причина' || batch[1] != batch[3]
+        throw Error('Потерян порядок готовых наказаний')
+    for invalid in ['', '12, 34', '/mute {id} 30 Причина', '/kick'] {
         rejected := false
-        try MassPunishments.Queue(invalid[1], invalid[2])
+        try MassPunishments.Queue(invalid)
         catch ValueError
             rejected := true
         if !rejected
             throw Error('Принята неверная массовая команда')
     }
-    app.mass.ids.Value := '12, 34'
-    app.mass.template.Value := '/mute {id} 30 Причина'
+    app.mass.input.Value := '/mute 12 30 Причина`n/kick 34 Причина'
+    app.mass.Add()
+    if app.mass.draft.Length != 2 || app.mass.list.GetCount() != 2
+        throw Error('Не добавлены готовые команды в очередь')
+    app.mass.list.Modify(1, 'Select Focus')
+    app.mass.Remove()
+    if app.mass.draft.Length != 1 || app.mass.draft[1] != '/kick 34 Причина'
+        throw Error('Удалена неверная строка наказаний')
     app.mass.Start()
-    originalQueue := app.mass.queue
-    app.mass.ids.Value := '99'
-    app.mass.Start()
-    if app.mass.queue != originalQueue || app.mass.queue.Length != 2 || app.mass.sent != 0
-        throw Error('Повторный запуск изменил очередь')
-    app.mass.Stop()
     if app.mass.running
-        throw Error('Не остановлена массовая отправка')
-    if Clicker.Interval('50') != 50 || Clicker.Interval('60000') != 60000
-        throw Error('Неверно обработан интервал кликера')
+        throw Error('Разрешён запуск вне игры')
+    app.mass.Clear()
+    if app.mass.draft.Length
+        throw Error('Не очищена очередь')
     for invalid in ['0', '49', '60001', '-100', 'abc'] {
         rejected := false
         try Clicker.Interval(invalid)
@@ -988,13 +994,21 @@ RunChecks() {
         if !rejected
             throw Error('Принят неверный интервал кликера')
     }
+    if Clicker.Interval('50') != 50 || Clicker.Interval('60000') != 60000
+        throw Error('Неверный интервал кликера')
+    app.mass.keyField.Value := 'F23'
+    app.mass.SaveKey()
+    if app.mass.key != 'F23' || IniRead(app.ini, 'MassPunishments', 'Key') != 'F23'
+        throw Error('Не сохранена клавиша массовой выдачи')
+    app.clicker.keyField.Value := 'F23'
+    app.clicker.SaveKey()
+    if app.clicker.key = 'F23'
+        throw Error('Допущен конфликт клавиш')
+    app.mass.keyField.Value := ''
+    app.mass.SaveKey()
     app.clicker.Start()
-    app.mass.Start()
-    if app.mass.running || !app.clicker.running
-        throw Error('Разрешена одновременная работа кликера и массовых команд')
-    app.clicker.Stop()
     if app.clicker.running
-        throw Error('Не остановлен кликер')
+        throw Error('Кликер запущен вне игры')
     FileAppend 'OK: mass commands, duplicates, invalid input, frozen queue and cancellation`n', '*'
     FileAppend 'OK: native button events, pages, Change Log, dark lists, categories, key capture, reports, overlays, settings`n', '*'
     ExitApp

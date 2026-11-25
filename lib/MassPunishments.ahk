@@ -3,92 +3,118 @@ class MassPunishments {
         this.app := app
         this.running := false
         this.serial := 0
+        this.draft := []
+        this.key := IniRead(app.ini, 'MassPunishments', 'Key', '')
         this.tickCallback := this.Tick.Bind(this)
     }
     Build() {
         app := this.app, page := 'Массовые наказания'
         app.Card(page, 272, 102, 884, 611)
-        app.Label(page, 298, 124, 810, 'Список ID', 13, , 700)
-        app.Label(page, 298, 155, 810, 'Разделяй ID пробелами, запятыми или новой строкой. Повторы будут убраны.', 10, 'A9A9B3')
-        this.ids := app.window.AddEdit('x298 y190 w250 h310 Multi WantReturn VScroll Background252527 cEEEEF2 -E0x200')
-        Theme.Dark(this.ids)
-        app.pages[page].Push(this.ids)
-        app.Label(page, 574, 192, 544, 'Команда для каждого игрока', 12, , 600)
-        this.template := app.RoundedInput(page, 574, 231, 548, 40, IniRead(app.ini, 'MassPunishments', 'Template', '/mute {id} 30 Причина'))
-        app.Label(page, 574, 286, 548, 'Вместо {id} подставится ID из списка. Укажи срок и причину в самой команде.', 10, 'A9A9B3', , 46)
-        app.Button(page, 574, 347, 220, 'Предпросмотр', this.Preview.Bind(this))
-        this.previewField := app.window.AddEdit('x574 y405 w548 h95 Multi ReadOnly VScroll Background252527 cEEEEF2 -E0x200')
-        Theme.Dark(this.previewField)
-        app.pages[page].Push(this.previewField)
-        app.Button(page, 298, 530, 250, 'Запустить через 3 секунды', this.Start.Bind(this), true)
-        app.Button(page, 574, 530, 170, 'Остановить', this.Stop.Bind(this))
-        this.status := app.Label(page, 298, 587, 824, 'Готово к запуску', 10, 'B8B8C0', , 38)
-        app.Label(page, 298, 644, 824, 'После запуска переключись в игру с закрытым чатом. При смене окна отправка остановится. Счётчик показывает отправку, а не результат выдачи.', 10, '8F8F9B', , 48)
+        app.Label(page, 298, 122, 810, 'Добавить наказания', 13, , 700)
+        app.Label(page, 298, 153, 810, 'Вводи готовые команды. Каждое наказание с новой строки, например /mute 123 30 Причина.', 10, 'A9A9B3')
+        this.input := app.window.AddEdit('x298 y187 w610 h80 Multi WantReturn VScroll Background252527 cEEEEF2 -E0x200')
+        Theme.Dark(this.input)
+        app.pages[page].Push(this.input)
+        app.Button(page, 926, 187, 196, 'Добавить в список', this.Add.Bind(this))
+        this.list := app.Add(page, 'ListView', 'x298 y288 w824 h220 -Multi', ['№', 'Команда'])
+        app.Columns(this.list, [60, 740])
+        app.Button(page, 298, 523, 180, 'Удалить строку', this.Remove.Bind(this))
+        app.Button(page, 494, 523, 180, 'Очистить список', this.Clear.Bind(this))
+        app.Button(page, 690, 523, 180, 'Остановить', this.Stop.Bind(this))
+        this.keyField := KeyPicker(app.window, 'x298 y578 w420 h40', this.key)
+        app.pages[page].Push(this.keyField.control)
+        app.Button(page, 738, 578, 210, 'Сохранить клавишу', this.SaveKey.Bind(this))
+        this.status := app.Label(page, 298, 636, 824, 'Назначь клавишу. В игре она запускает и останавливает выдачу.', 10, 'B8B8C0', , 52)
+        this.Register()
     }
-    static Queue(ids, template) {
-        template := Trim(template)
-        if !RegExMatch(template, '^/[A-Za-z][A-Za-z0-9_]*\s') || InStr(template, '`n') || InStr(template, '`r')
-            throw ValueError('Укажи одну команду, начиная с /.')
-        if StrSplit(template, '{id}').Length != 2 || RegExMatch(StrReplace(template, '{id}'), '[{}]')
-            throw ValueError('В команде должно быть ровно одно поле {id}, без других маркеров.')
-        if StrLen(template) > 500
-            throw ValueError('Команда слишком длинная.')
-        if RegExMatch(ids, '[^0-9\s,;]')
-            throw ValueError('В списке должны быть только числовые ID и разделители.')
-        queue := [], seen := Map()
-        for id in StrSplit(RegExReplace(Trim(ids), '[\s,;]+', ' '), ' ') {
-            if id = ''
+    static Queue(text) {
+        queue := []
+        for line in StrSplit(text, '`n', '`r') {
+            line := Trim(line)
+            if line = ''
                 continue
-            if StrLen(id) > 10
-                throw ValueError('Слишком длинный ID: ' id)
-            id := Integer(id)
-            if seen.Has(id)
-                continue
-            seen[id] := true
-            queue.Push(StrReplace(template, '{id}', id))
+            if !RegExMatch(line, '^/[A-Za-z][A-Za-z0-9_]*\s+\S') || RegExMatch(line, '[{}\x00-\x1F]') || StrLen(line) > 500
+                throw ValueError('Введи готовую команду с аргументами без маркеров: ' SubStr(line, 1, 60))
+            queue.Push(line)
             if queue.Length > 500
-                throw ValueError('За один запуск можно отправить до 500 команд.')
+                throw ValueError('За один запуск можно добавить до 500 команд.')
         }
         if !queue.Length
-            throw ValueError('Добавь ID игроков в список.')
+            throw ValueError('Введи хотя бы одну команду.')
         return queue
     }
-    Preview(*) {
+    Add(*) {
+        if this.running
+            return
         try {
-            queue := MassPunishments.Queue(this.ids.Value, this.template.Value)
-            text := ''
-            for index, command in queue {
-                if index > 10
-                    break
-                text .= (index = 1 ? '' : '`r`n') command
-            }
-            this.previewField.Value := text
-            this.status.Text := 'Команд: ' queue.Length '. Интервал: 1 секунда. В предпросмотре первые 10.'
-            return queue
-        } catch as err {
-            this.previewField.Value := ''
+            commands := MassPunishments.Queue(this.input.Value)
+            if this.draft.Length + commands.Length > 500
+                throw ValueError('В списке может быть до 500 команд.')
+            this.draft.Push(commands*)
+            this.input.Value := ''
+            this.Render()
+        } catch as err
             this.status.Text := err.Message
-            return false
+    }
+    Render() {
+        this.list.Delete()
+        for index, command in this.draft
+            this.list.Add('', index, command)
+        this.status.Text := 'В очереди: ' this.draft.Length '. Выдача по порядку, раз в секунду. Чат перед запуском должен быть закрыт.'
+    }
+    Remove(*) {
+        if this.running
+            return
+        row := this.list.GetNext()
+        if row {
+            this.draft.RemoveAt(row)
+            this.Render()
         }
     }
+    Clear(*) {
+        if this.running
+            return
+        this.draft := []
+        this.Render()
+    }
+    SaveKey(*) {
+        UtilityHotkey.Save(this)
+    }
+    Register() {
+        UtilityHotkey.Register(this)
+    }
+    Toggle(*) {
+        if this.running
+            this.Stop()
+        else {
+            for modifier in ['Ctrl', 'Alt', 'Shift', 'LWin', 'RWin']
+                KeyWait modifier
+            this.Start()
+        }
+        if this.key != ''
+            KeyWait RegExReplace(this.key, '^[~*$<>^!+#]+')
+    }
     Start(*) {
-        if this.running {
-            this.status.Text := 'Список уже выполняется.'
+        if this.running
+            return
+        if !this.draft.Length {
+            this.status.Text := 'Добавь команды в список.'
             return
         }
-        queue := this.Preview()
-        if !queue
-            return
         if this.app.entry.running || this.app.clicker.running {
             this.status.Text := 'Останови кликер и дождись завершения команд при входе.'
             return
         }
-        IniWrite Trim(this.template.Value), this.app.ini, 'MassPunishments', 'Template'
-        this.queue := queue, this.sent := 0, this.target := 0
+        if !this.app.context() {
+            this.status.Text := 'Запуск доступен только в окне игры.'
+            return
+        }
+        this.queue := this.draft.Clone(), this.sent := 0
+        this.target := DllCall('GetForegroundWindow', 'ptr')
         this.serial += 1
         this.running := true
-        this.status.Text := 'Переключись в игру. Отправка начнётся через 3 секунды.'
-        SetTimer this.tickCallback, -3000
+        this.status.Text := 'Выдача запущена.'
+        SetTimer this.tickCallback, -1
     }
     Stop(*) {
         this.serial += 1

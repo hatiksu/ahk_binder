@@ -454,6 +454,10 @@ class BinderFeatures {
                 DarkDialog.Message 'Изображение не найдено.'
                 return
             }
+            if key.Value != '' && (key.Value = this.mass.key || key.Value = this.clicker.key) {
+                DarkDialog.Message 'Эта клавиша занята массовой выдачей или кликером.'
+                return
+            }
             if key.Value != '' && key.Value = this.entry.key {
                 DarkDialog.Message 'Эта клавиша занята командами при входе.'
                 return

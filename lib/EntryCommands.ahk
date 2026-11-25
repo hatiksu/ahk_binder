@@ -88,6 +88,8 @@ class EntryCommands {
         this.Refresh()
     }
     Conflict(key, trigger) {
+        if key != '' && (key = this.app.mass.key || key = this.app.clicker.key)
+            return 'Эта клавиша занята массовой выдачей или кликером.'
         for item in this.app.binds {
             if key != '' && item.key = key
                 return 'Эта клавиша уже занята другим биндом.'
