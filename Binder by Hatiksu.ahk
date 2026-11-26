@@ -584,12 +584,12 @@ RunChecks() {
         parsed := app.Parse(original)
         if StrReplace(original, '`r') != StrReplace(app.Join(parsed.lines), '`r')
             throw Error('Round-trip changed ' gender)
-        if parsed.entries.Length != 1543 || parsed.problems.Length != 5
+        if parsed.entries.Length != 1545 || parsed.problems.Length != 5
             throw Error('Unexpected parsing result: ' gender)
         app.gender := gender
         app.Load()
         app.Activate()
-        if app.registered.Length != 1543
+        if app.registered.Length != 1545
             throw Error('Registration failed: ' gender)
         FileAppend 'OK: ' gender ' parse, lossless export, registration`n', '*'
     }
@@ -760,7 +760,7 @@ RunChecks() {
     app.editorFields.key.Value := '/hatiksu_test'
     app.editorFields.body.Value := 'Проверка.{enter}{rep}'
     CheckClick(app.editorFields.save)
-    if app.config.entries.Length != 1544
+    if app.config.entries.Length != 1546
         throw Error('Не работает сохранение триггера через кнопку')
     app.ShowPage('Репорты')
     ReportCounter.Accept(app, '10000001', FormatTime(, 'yyyyMMddHHmmss'))
